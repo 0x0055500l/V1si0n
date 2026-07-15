@@ -4,6 +4,11 @@ export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e) => {
+    setMousePos({ x: e.clientX, y: e.clientY });
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -17,13 +22,20 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="auth-container">
+    <div className="auth-container" onMouseMove={handleMouseMove}>
+      <div 
+        className="mouse-tracking-orb"
+        style={{
+          left: `${mousePos.x}px`,
+          top: `${mousePos.y}px`,
+        }}
+      ></div>
       <div className="bg-orb bg-orb-1"></div>
       <div className="bg-orb bg-orb-2"></div>
       
-      <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '400px' }}>
+      <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '400px', position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 className="text-gradient" style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>V1si0n</h1>
+          <h1 className="text-gradient vision-text" style={{ fontSize: '2.5rem', marginBottom: '0.5rem', cursor: 'default' }}>V1si0n</h1>
           <p className="text-muted">Sistema Experto de Control de Calidad IA</p>
         </div>
 

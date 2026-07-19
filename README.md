@@ -8,7 +8,7 @@ El proyecto está dividido en tres componentes principales para asegurar escalab
 
 - **/frontend**: Interfaz web interactiva construida con **React** y **Vite**. Diseñada con un enfoque estético premium (Glassmorphism, Dark Mode).
 - **/backend**: API robusta desarrollada con **FastAPI** y **PostgreSQL**. Se encarga de la seguridad (autenticación JWT), manejo de usuarios e inferencia del modelo.
-- **/ai**: Scripts y utilidades para el entrenamiento de la Inteligencia Artificial (**YOLOv8**) mediante Google Colab.
+- **/ai**: Scripts y utilidades para el entrenamiento local de la Inteligencia Artificial (**YOLOv8**) aprovechando la potencia de tu máquina.
 
 ---
 
@@ -46,14 +46,14 @@ Debes configurar tu variable de entorno apuntando a tu base de datos:
 uvicorn main:app --reload
 ```
 
-### 3. Inteligencia Artificial (Entrenamiento YOLOv8)
-El modelo de visión artificial se entrena en la nube para aprovechar la aceleración por GPU.
+### 3. Inteligencia Artificial (Entrenamiento YOLOv8 Local)
+El modelo de visión artificial se entrena localmente para aprovechar la potencia computacional de tu máquina.
 
 1. Abre el script `ai/train_yolov8.py`.
-2. Súbelo a [Google Colab](https://colab.research.google.com/) o ábrelo en tu entorno preferido.
-3. Configura tu API Key de Roboflow en el script.
-4. Ejecuta el código utilizando una GPU (Entorno de ejecución -> T4 GPU).
-5. Descarga el modelo resultante (`best.pt`) e intégralo al Backend.
+2. Asegúrate de tener instalado Python y las dependencias (el script intentará instalarlas).
+3. Configura tu API Key de Roboflow en el script si necesitas descargar el dataset.
+4. Ejecuta el script localmente: `python ai/train_yolov8.py`.
+5. El modelo resultante (`best.pt`) se guardará localmente y podrás integrarlo directamente al Backend.
 
 ---
 

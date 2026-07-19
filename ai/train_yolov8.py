@@ -1,5 +1,5 @@
-# Script para entrenar YOLOv8 en Google Colab
-# Instrucciones: Sube este script a un Notebook en Google Colab o ejecútalo en un entorno con GPU.
+# Script para entrenar YOLOv8 Localmente
+# Instrucciones: Ejecuta este script en tu máquina local. Se recomienda tener una GPU compatible instalada.
 
 import os
 import subprocess
@@ -37,7 +37,7 @@ def train_model(data_path):
         imgsz=640,
         batch=16,
         name="v1si0n_pcb_model",
-        device=0 # Usa la GPU 0 (Asegúrate de que Colab tenga GPU asignada)
+        device=0 # Usa la GPU local 0. Si no tienes GPU, cambia a device='cpu'
     )
     
     print("Entrenamiento completado.")
@@ -56,4 +56,4 @@ if __name__ == "__main__":
     dataset_path = "dataset" 
     
     # train_model(dataset_path)
-    print("Por favor, lee los comentarios y ajusta los parámetros antes de ejecutar en Colab.")
+    print("Por favor, lee los comentarios y ajusta los parámetros antes de ejecutar el entrenamiento local.")

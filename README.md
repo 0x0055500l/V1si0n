@@ -6,8 +6,8 @@ V1si0n es un sistema moderno, responsivo y ultraseguro diseñado para la detecci
 
 El proyecto está dividido en tres componentes principales para asegurar escalabilidad y mantenibilidad:
 
-- **/frontend**: Interfaz web interactiva construida con **React** y **Vite**. Diseñada con un enfoque estético premium (Glassmorphism, Dark Mode).
-- **/backend**: API robusta desarrollada con **FastAPI** y **PostgreSQL**. Se encarga de la seguridad (autenticación JWT), manejo de usuarios e inferencia del modelo.
+- **/frontend**: Interfaz web interactiva construida con **React** y **Vite**. Diseñada con un enfoque estético premium (Glassmorphism, Dark Mode). Conectada directamente a la API backend.
+- **/backend**: API robusta desarrollada con **FastAPI** y **PostgreSQL**. Se encarga de la seguridad, Rate Limiting, manejo de sesiones (JWT), gestión de base de datos e inferencia del modelo.
 - **/ai**: Scripts y utilidades para el entrenamiento local de la Inteligencia Artificial (**YOLOv8**) aprovechando la potencia de tu máquina.
 
 ---
@@ -22,7 +22,8 @@ cd frontend
 npm install
 npm run dev
 ```
-La aplicación estará disponible en `http://localhost:5173`.
+La aplicación estará disponible en `http://localhost:5173`. 
+> **Nota de Acceso:** Para ingresar, usa el usuario `admin` y la contraseña `admin123`.
 
 ### 2. Backend (API & Base de Datos)
 Requiere [Python 3.8+](https://www.python.org/) y PostgreSQL instalado.
@@ -36,15 +37,20 @@ python -m venv venv
 
 pip install -r requirements.txt
 ```
+*(Nota: El proyecto usa `bcrypt==3.2.0` específicamente por temas de compatibilidad con `passlib`).*
 
-**Configuración:**
-Debes configurar tu variable de entorno apuntando a tu base de datos:
-`DATABASE_URL="postgresql://usuario:contraseña@localhost/v1si0n"`
+**Configuración de Base de Datos:**
+Asegúrate de tener un servidor PostgreSQL corriendo en el puerto por defecto (5432).
+1. Actualiza el archivo `backend/database.py` (o tu `.env`) con tus credenciales:
+   `DATABASE_URL="postgresql://usuario:contraseña@localhost/v1si0n"`
+2. Puedes ejecutar el script proporcionado para automatizar la creación de la DB: `python create_db.py`.
+3. Crea el usuario de pruebas ejecutando: `python create_admin.py` (esto creará el usuario `admin` con contraseña `admin123`).
 
 **Ejecución:**
 ```bash
 uvicorn main:app --reload
 ```
+La API estará disponible en `http://localhost:8000`. Puedes probar los endpoints interactivos en `http://localhost:8000/docs`.
 
 ### 3. Inteligencia Artificial (Entrenamiento YOLOv8 Local)
 El modelo de visión artificial se entrena localmente para aprovechar la potencia computacional de tu máquina.
@@ -57,12 +63,13 @@ El modelo de visión artificial se entrena localmente para aprovechar la potenci
 
 ---
 
-## 🔒 Características de Seguridad
+## 🔒 Características de Seguridad (Nivel Senior)
 
-- **Autenticación con JWT (JSON Web Tokens):** Las sesiones se manejan de manera asíncrona sin estado.
-- **Contraseñas Seguras:** Hashing mediante `bcrypt` (Passlib) integrado en la base de datos PostgreSQL.
-- **Validación de Datos:** Uso estricto de esquemas Pydantic y validación de tipos MIME en la subida de imágenes para prevenir inyecciones.
-- **CORS Configurado:** Accesos restringidos exclusivamente a los orígenes del frontend.
+- **Prevención de Fuerza Bruta (Rate Limiting):** Se implementó `slowapi` limitando el endpoint de login (`/token`) a un máximo de **5 intentos por minuto por IP**.
+- **Encabezados de Seguridad (HTTP Headers):** Middleware configurado con protección XSS (`X-XSS-Protection`), prevención de Sniffing MIME (`X-Content-Type-Options: nosniff`), bloqueo de Iframes/Clickjacking (`X-Frame-Options: DENY`) y `Strict-Transport-Security`.
+- **Autenticación con JWT:** Tokens de acceso (JSON Web Tokens) persistentes configurados con un tiempo de expiración estricto de **1 hora**. El Frontend gestiona este ciclo de vida de forma automática verificando la validez del token en cada recarga de página.
+- **Contraseñas Seguras:** Hashing mediante `bcrypt` integrado en PostgreSQL, sin almacenar las contraseñas en texto plano.
+- **Validación de Datos y Manejo de Errores Genéricos:** Uso estricto de Pydantic. Los errores de login muestran "Usuario o contraseña incorrectos", previniendo la enumeración de usuarios válidos.
 
 ---
 *Desarrollado para la clase de Inteligencia Artificial.*

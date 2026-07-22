@@ -4,21 +4,45 @@ export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   const handleMouseMove = (e) => {
     setMousePos({ x: e.clientX, y: e.clientY });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     
-    // Simulating API call since Python backend cannot run on this machine yet
-    setTimeout(() => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          username: username,
+          password: password,
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error('Demasiados intentos. Por favor, espera un minuto e inténtalo de nuevo.');
+        }
+        throw new Error('Usuario o contraseña incorrectos.');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('access_token', data.access_token);
       onLogin(username);
+    } catch (err) {
+      setError(err.message);
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -40,6 +64,11 @@ export default function Login({ onLogin }) {
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {error && (
+            <div style={{ padding: '0.75rem', backgroundColor: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', borderRadius: '8px', fontSize: '0.875rem', border: '1px solid rgba(255, 59, 48, 0.2)' }}>
+              {error}
+            </div>
+          )}
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
               Usuario Inspector

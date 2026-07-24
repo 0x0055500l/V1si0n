@@ -16,8 +16,10 @@ def download_dataset():
     print("Descargando dataset desde Roboflow...")
     
     # Ejemplo genérico, el usuario deberá actualizar los parámetros:
-    rf = Roboflow(api_key="TU_API_KEY_AQUI")
-    project = rf.workspace("pcb-defects").project("pcb-defect-detection")
+    # Actualizado con tu workspace real
+    rf = Roboflow(api_key="vo0bSM9Ki6IbRpOxcbFH")
+    # ATENCIÓN: El nombre de tu proyecto en Roboflow (suele convertirse a minúsculas y guiones)
+    project = rf.workspace("josseth-alejandro").project("pcb_v1si0n")
     dataset = project.version(1).download("yolov8")
     return dataset.location
 
@@ -49,11 +51,6 @@ if __name__ == "__main__":
     except ImportError:
         install_dependencies()
         
-    # Descomentar cuando tengas la API key de Roboflow
-    # dataset_path = download_dataset()
-    
-    # Suponiendo que el dataset se llama 'dataset' y está en el mismo directorio
-    dataset_path = "dataset" 
-    
-    # train_model(dataset_path)
-    print("Por favor, lee los comentarios y ajusta los parámetros antes de ejecutar el entrenamiento local.")
+    print("Descargando dataset y comenzando entrenamiento...")
+    dataset_path = download_dataset()
+    train_model(dataset_path)

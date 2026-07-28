@@ -37,7 +37,14 @@ export default function Login({ onLogin }) {
 
       const data = await response.json();
       localStorage.setItem('access_token', data.access_token);
-      onLogin(username);
+      
+      // Fetch user role
+      const userRes = await fetch('http://127.0.0.1:8000/users/me', {
+        headers: { 'Authorization': `Bearer ${data.access_token}` }
+      });
+      const userData = await userRes.json();
+      
+      onLogin(username, userData.role);
     } catch (err) {
       setError(err.message);
     } finally {

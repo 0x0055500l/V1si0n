@@ -44,7 +44,7 @@ export default function Login({ onLogin }) {
       });
       const userData = await userRes.json();
       
-      onLogin(username, userData.role);
+      onLogin(username, userData.role.name);
     } catch (err) {
       setError(err.message);
     } finally {

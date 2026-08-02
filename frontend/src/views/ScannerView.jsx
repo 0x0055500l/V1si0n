@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export default function ScannerView({ user }) {
   const [image, setImage] = useState(null);
@@ -6,6 +6,31 @@ export default function ScannerView({ user }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [results, setResults] = useState(null);
   const fileInputRef = useRef(null);
+
+  const [pcbModels, setPcbModels] = useState([]);
+  const [productionLines, setProductionLines] = useState([]);
+  const [selectedModel, setSelectedModel] = useState('');
+  const [selectedLine, setSelectedLine] = useState('');
+
+  useEffect(() => {
+    const fetchCatalogs = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+        
+        const [modelsRes, linesRes] = await Promise.all([
+          fetch('http://127.0.0.1:8000/pcb-models', { headers }),
+          fetch('http://127.0.0.1:8000/production-lines', { headers })
+        ]);
+
+        if (modelsRes.ok) setPcbModels(await modelsRes.json());
+        if (linesRes.ok) setProductionLines(await linesRes.json());
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchCatalogs();
+  }, []);
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -18,12 +43,17 @@ export default function ScannerView({ user }) {
   };
 
   const handleAnalyze = async () => {
-    if (!imageFile) return;
+    if (!imageFile || !selectedModel || !selectedLine) {
+      alert("Por favor selecciona un Modelo y Línea de Producción");
+      return;
+    }
     setAnalyzing(true);
     
     try {
       const formData = new FormData();
       formData.append('file', imageFile);
+      formData.append('pcb_model_id', selectedModel);
+      formData.append('production_line_id', selectedLine);
 
       const token = localStorage.getItem('access_token');
       const res = await fetch('http://127.0.0.1:8000/predict', {
@@ -53,9 +83,30 @@ export default function ScannerView({ user }) {
   return (
     <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
       {/* Upload Section */}
-      <section className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <section className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'fit-content' }}>
         <h3>Análisis de Placas (PCBs)</h3>
         
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Línea de Producción</label>
+            <select value={selectedLine} onChange={e => setSelectedLine(e.target.value)} style={{ width: '100%', padding: '0.75rem', background: 'var(--surface-bg)', color: 'white', border: '1px solid var(--surface-border)', borderRadius: '8px' }}>
+              <option value="">-- Seleccionar Línea --</option>
+              {productionLines.map(line => (
+                <option key={line.id} value={line.id}>{line.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Modelo PCB</label>
+            <select value={selectedModel} onChange={e => setSelectedModel(e.target.value)} style={{ width: '100%', padding: '0.75rem', background: 'var(--surface-bg)', color: 'white', border: '1px solid var(--surface-border)', borderRadius: '8px' }}>
+              <option value="">-- Seleccionar Modelo --</option>
+              {pcbModels.map(model => (
+                <option key={model.id} value={model.id}>{model.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <div 
           onClick={() => fileInputRef.current.click()}
           style={{ 
@@ -65,7 +116,8 @@ export default function ScannerView({ user }) {
             textAlign: 'center',
             cursor: 'pointer',
             background: 'rgba(99, 102, 241, 0.05)',
-            transition: 'all var(--transition-fast)'
+            transition: 'all var(--transition-fast)',
+            marginTop: '1rem'
           }}
         >
           <input 
@@ -83,7 +135,7 @@ export default function ScannerView({ user }) {
 
         <button 
           className="btn btn-primary" 
-          disabled={!image || analyzing} 
+          disabled={!image || analyzing || !selectedModel || !selectedLine} 
           onClick={handleAnalyze}
           style={{ width: '100%' }}
         >
@@ -92,7 +144,7 @@ export default function ScannerView({ user }) {
       </section>
 
       {/* Results Section */}
-      <section className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <section className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'fit-content' }}>
         <h3>Resultados de Inspección</h3>
         
         {image ? (
@@ -101,7 +153,7 @@ export default function ScannerView({ user }) {
             
             {results && !analyzing && results.defects.map((defect, idx) => (
               <div key={idx} style={{ position: 'absolute', border: '2px solid var(--danger)', top: `${defect.bbox[1]}%`, left: `${defect.bbox[0]}%`, width: `${defect.bbox[2]-defect.bbox[0]}%`, height: `${defect.bbox[3]-defect.bbox[1]}%`, background: 'rgba(239, 68, 68, 0.2)' }}>
-                 <span style={{ position: 'absolute', top: '-24px', left: '-2px', background: 'var(--danger)', color: 'white', padding: '2px 6px', fontSize: '12px', fontWeight: 'bold' }}>
+                 <span style={{ position: 'absolute', top: '-24px', left: '-2px', background: 'var(--danger)', color: 'white', padding: '2px 6px', fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                    {defect.type} ({Math.round(defect.confidence * 100)}%)
                  </span>
               </div>

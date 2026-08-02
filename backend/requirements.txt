@@ -11,3 +11,4 @@ python-dotenv
 slowapi
 ollama
 requests
+ultralytics

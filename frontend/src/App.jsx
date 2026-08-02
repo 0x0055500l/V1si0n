@@ -22,7 +22,7 @@ function App() {
           if (response.ok) {
             const data = await response.json();
             setUser(data.username);
-            setRole(data.role);
+            setRole(data.role.name);
           } else {
             localStorage.removeItem('access_token');
           }

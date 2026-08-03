@@ -41,7 +41,7 @@ export default function UsersView() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ username: newUsername, password: newPassword, role: newRole })
+        body: JSON.stringify({ username: newUsername, password: newPassword, role_id: newRole === 'admin' ? 2 : 1 })
       });
       if (res.ok) {
         setNewUsername('');
@@ -97,7 +97,7 @@ export default function UsersView() {
                 <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   <td style={{ padding: '1rem' }}>{u.id}</td>
                   <td style={{ padding: '1rem' }}>{u.username}</td>
-                  <td style={{ padding: '1rem', textTransform: 'capitalize' }}>{u.role}</td>
+                  <td style={{ padding: '1rem', textTransform: 'capitalize' }}>{u.role ? u.role.name : 'Unknown'}</td>
                   <td style={{ padding: '1rem' }}>{u.is_active ? 'Activo' : 'Inactivo'}</td>
                   <td style={{ padding: '1rem' }}>
                     <button onClick={() => handleDelete(u.id)} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>

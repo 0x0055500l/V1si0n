@@ -14,7 +14,17 @@ import ollama
 import os
 import requests
 import io
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from PIL import Image
+
+try:
+    from faster_whisper import WhisperModel
+    WHISPER_AVAILABLE = True
+    whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8")
+except ImportError:
+    WHISPER_AVAILABLE = False
 
 try:
     from ultralytics import YOLO
@@ -54,7 +64,8 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    # allow_origins=origins,
+    allow_origins=["*"], # Permitir todo temporalmente
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -137,6 +148,13 @@ def update_user(user_id: int, user_update: schemas.UserUpdate, db: Session = Dep
     db.commit()
     db.refresh(db_user)
     return db_user
+
+@app.put("/users/me/dashboard_config")
+def update_my_dashboard_config(config: schemas.UserUpdateConfig, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    current_user.dashboard_config = config.dashboard_config
+    db.commit()
+    db.refresh(current_user)
+    return current_user
 
 @app.delete("/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db), admin: models.User = Depends(get_current_admin)):
@@ -362,6 +380,37 @@ async def predict_defect(
                 requests.post(tg_url, json=tg_data, timeout=5)
             except:
                 pass # Ignorar errores de red de telegram
+        
+        # Enviar alerta por Correo Electrónico
+        smtp_server = db.query(models.SystemConfig).filter(models.SystemConfig.key == "email_smtp_server").first()
+        smtp_port = db.query(models.SystemConfig).filter(models.SystemConfig.key == "email_port").first()
+        smtp_user = db.query(models.SystemConfig).filter(models.SystemConfig.key == "email_user").first()
+        smtp_pass = db.query(models.SystemConfig).filter(models.SystemConfig.key == "email_password").first()
+        email_to = db.query(models.SystemConfig).filter(models.SystemConfig.key == "email_recipient").first()
+
+        if smtp_server and smtp_user and smtp_pass and email_to:
+            try:
+                msg = MIMEMultipart()
+                msg['From'] = smtp_user.value
+                msg['To'] = email_to.value
+                msg['Subject'] = f"⚠️ ALERTA V1si0n: Defecto detectado en placa {scan_log.id}"
+                
+                body = f"""
+                <h2>Alerta de Calidad V1si0n</h2>
+                <p><strong>Inspector:</strong> {current_user.username}</p>
+                <p><strong>Archivo:</strong> {file.filename}</p>
+                <p><strong>Resultado:</strong> Defectuoso</p>
+                <p>Por favor revise el panel de control para más detalles.</p>
+                """
+                msg.attach(MIMEText(body, 'html'))
+                
+                server = smtplib.SMTP(smtp_server.value, int(smtp_port.value) if smtp_port else 587)
+                server.starttls()
+                server.login(smtp_user.value, smtp_pass.value)
+                server.send_message(msg)
+                server.quit()
+            except Exception as e:
+                print(f"Error enviando correo: {e}")
 
     return {
         "status": "success",
@@ -381,7 +430,39 @@ def get_stats(db: Session = Depends(get_db), current_user: models.User = Depends
     total_scans = db.query(models.ScanLog).count()
     defective_scans = db.query(models.ScanLog).filter(models.ScanLog.status == "Defectuoso").count()
     ok_scans = db.query(models.ScanLog).filter(models.ScanLog.status == "OK").count()
-    return {"total": total_scans, "defectuoso": defective_scans, "ok": ok_scans}
+    
+    # Distribución de defectos
+    defect_counts = db.query(models.DefectDictionary.name, func.count(models.ScanDefect.id)).join(
+        models.ScanDefect, models.ScanDefect.defect_id == models.DefectDictionary.id
+    ).group_by(models.DefectDictionary.name).all()
+    
+    distribution = [{"name": name, "value": count} for name, count in defect_counts]
+
+    # Desempeño por línea
+    line_stats = db.query(models.ProductionLine.name, models.ScanLog.status, func.count(models.ScanLog.id)).join(
+        models.ScanLog, models.ScanLog.production_line_id == models.ProductionLine.id
+    ).group_by(models.ProductionLine.name, models.ScanLog.status).all()
+    
+    lines_dict = {}
+    for line_name, status, count in line_stats:
+        if line_name not in lines_dict:
+            lines_dict[line_name] = {"name": line_name, "ok": 0, "defectuoso": 0}
+        
+        if status == "OK":
+            lines_dict[line_name]["ok"] = count
+        else:
+            lines_dict[line_name]["defectuoso"] = count
+
+    recent = db.query(models.ScanLog).order_by(models.ScanLog.timestamp.desc()).limit(5).all()
+    
+    return {
+        "total": total_scans, 
+        "defectuoso": defective_scans, 
+        "ok": ok_scans,
+        "distribution": distribution,
+        "line_performance": list(lines_dict.values()),
+        "recent_scans": recent
+    }
 
 
 # ================= OLLAMA CHATBOT =================
@@ -428,3 +509,26 @@ async def chat_with_ollama(req: schemas.ChatRequest, current_user: models.User =
         return {"response": bot_response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ollama local no disponible: {str(e)}")
+
+@app.post("/speech-to-text")
+async def speech_to_text(audio: UploadFile = File(...), current_user: models.User = Depends(get_current_user)):
+    if not WHISPER_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Faster-Whisper no está instalado o falló al cargar.")
+    
+    # Guardar audio en memoria o temporal
+    temp_file = f"/tmp/audio_{current_user.id}.webm"
+    try:
+        with open(temp_file, "wb") as f:
+            f.write(await audio.read())
+            
+        segments, info = whisper_model.transcribe(temp_file, beam_size=5, language="es")
+        text = " ".join([segment.text for segment in segments]).strip()
+        
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+            
+        return {"text": text}
+    except Exception as e:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+        raise HTTPException(status_code=500, detail=f"Error transcribiendo audio: {str(e)}")

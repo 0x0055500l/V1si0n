@@ -12,3 +12,4 @@ slowapi
 ollama
 requests
 ultralytics
+faster-whisper

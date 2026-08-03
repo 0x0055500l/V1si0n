@@ -27,13 +27,17 @@ class UserUpdate(BaseModel):
     role_id: Optional[int] = None
     is_active: Optional[bool] = None
 
-class User(UserBase):
+class User(BaseModel):
     id: int
+    username: str
     is_active: bool
     role: Role
-
+    dashboard_config: Optional[str] = "{}"
     class Config:
         from_attributes = True
+
+class UserUpdateConfig(BaseModel):
+    dashboard_config: str
 
 # --- PRODUCTION LINES ---
 class ProductionLineBase(BaseModel):

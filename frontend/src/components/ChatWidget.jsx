@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, MessageSquare } from 'lucide-react';
+import { Send, Bot, MessageSquare, Mic } from 'lucide-react';
 
 export default function ChatWidget() {
   const [messages, setMessages] = useState([]);
   const [prompts, setPrompts] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   const endOfMessagesRef = useRef(null);
 
   useEffect(() => {
@@ -71,6 +74,64 @@ export default function ChatWidget() {
     }
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'audio.webm');
+
+        const token = localStorage.getItem('access_token');
+        setLoading(true);
+        try {
+          const res = await fetch('http://127.0.0.1:8000/speech-to-text', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            if (data.text) {
+              setInput(data.text);
+              handleSend(data.text);
+            }
+          } else {
+            console.error("Error en speech to text", await res.text());
+            alert("No se pudo procesar el audio. ¿Tienes instalado faster-whisper y ffmpeg?");
+          }
+        } catch (err) {
+          console.error("Error subiendo audio", err);
+        } finally {
+          setLoading(false);
+          stream.getTracks().forEach(track => track.stop());
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("No se pudo acceder al micrófono", err);
+      alert("No se pudo acceder al micrófono.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
   return (
     <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', height: 'calc(100vh - 4rem)' }}>
       
@@ -81,7 +142,7 @@ export default function ChatWidget() {
             <Bot size={24} color="white" />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Asistente V1si0n (llama3.2)</h2>
+            <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Asistente V1si0n (llama3.2 + Voice)</h2>
             <span style={{ fontSize: '0.85rem', color: '#10b981' }}>● Online</span>
           </div>
         </div>
@@ -103,14 +164,54 @@ export default function ChatWidget() {
             </div>
           ))}
           {loading && (
-            <div style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', borderBottomLeftRadius: '0', color: 'var(--text-muted)' }}>
-              Pensando...
+            <div style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', borderBottomLeftRadius: '0', color: 'var(--text-muted)', display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <span style={{ width: '8px', height: '8px', background: 'var(--primary)', borderRadius: '50%', animation: 'pulse 1.5s infinite' }}></span>
+              <span style={{ width: '8px', height: '8px', background: 'var(--primary)', borderRadius: '50%', animation: 'pulse 1.5s infinite 0.2s' }}></span>
+              <span style={{ width: '8px', height: '8px', background: 'var(--primary)', borderRadius: '50%', animation: 'pulse 1.5s infinite 0.4s' }}></span>
+              <span style={{ marginLeft: '8px' }}>V1si0n está escribiendo...</span>
             </div>
           )}
           <div ref={endOfMessagesRef} />
         </div>
 
-        <form onSubmit={(e) => { e.preventDefault(); handleSend(input); }} style={{ padding: '1.5rem', borderTop: '1px solid var(--surface-border)', display: 'flex', gap: '1rem' }}>
+        <form onSubmit={(e) => { e.preventDefault(); handleSend(input); }} style={{ padding: '1.5rem', borderTop: '1px solid var(--surface-border)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <button 
+            type="button" 
+            onMouseDown={startRecording}
+            onMouseUp={stopRecording}
+            onMouseLeave={stopRecording}
+            onTouchStart={startRecording}
+            onTouchEnd={stopRecording}
+            className={`btn ${isRecording ? 'btn-danger' : 'btn-secondary'}`} 
+            style={{ 
+              padding: '1rem', 
+              borderRadius: '50%', 
+              animation: isRecording ? 'pulse-record 1.5s infinite' : 'none',
+              position: 'relative'
+            }}
+            title="Mantén presionado para hablar"
+          >
+            <Mic size={20} color={isRecording ? 'white' : 'var(--text-muted)'} />
+            {isRecording && (
+              <span style={{
+                position: 'absolute',
+                top: '-35px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'var(--danger)',
+                color: 'white',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.5)'
+              }}>
+                Grabando...
+              </span>
+            )}
+          </button>
           <input 
             type="text" 
             value={input}
@@ -118,7 +219,13 @@ export default function ChatWidget() {
             placeholder="Escribe tu pregunta sobre PCBs..."
             style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--surface-border)', padding: '1rem', borderRadius: '8px', color: 'white' }}
           />
-          <button type="submit" className="btn btn-primary" disabled={loading} style={{ padding: '0 1.5rem' }}>
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            disabled={loading} 
+            style={{ padding: '1rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="Enviar mensaje"
+          >
             <Send size={20} />
           </button>
         </form>

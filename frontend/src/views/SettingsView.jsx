@@ -8,6 +8,7 @@ export default function SettingsView() {
   // Tab: pcb | line | defect | telegram
   const [form, setForm] = useState({ name: '', description: '', location: '', severity: 'Media' });
   const [telegramForm, setTelegramForm] = useState({ bot_token: '', chat_id: '' });
+  const [emailForm, setEmailForm] = useState({ smtp_server: '', port: '', user: '', password: '', recipient: '' });
 
   const endpoints = {
     pcb: 'http://127.0.0.1:8000/pcb-models',
@@ -20,15 +21,25 @@ export default function SettingsView() {
     try {
       const token = localStorage.getItem('access_token');
       
-      if (activeTab === 'telegram') {
+      if (activeTab === 'telegram' || activeTab === 'email') {
         const res = await fetch('http://127.0.0.1:8000/config', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
           const confList = await res.json();
-          const tk = confList.find(c => c.key === 'telegram_bot_token')?.value || '';
-          const cid = confList.find(c => c.key === 'telegram_chat_id')?.value || '';
-          setTelegramForm({ bot_token: tk, chat_id: cid });
+          if (activeTab === 'telegram') {
+            const tk = confList.find(c => c.key === 'telegram_bot_token')?.value || '';
+            const cid = confList.find(c => c.key === 'telegram_chat_id')?.value || '';
+            setTelegramForm({ bot_token: tk, chat_id: cid });
+          } else {
+            setEmailForm({
+              smtp_server: confList.find(c => c.key === 'email_smtp_server')?.value || '',
+              port: confList.find(c => c.key === 'email_port')?.value || '',
+              user: confList.find(c => c.key === 'email_user')?.value || '',
+              password: confList.find(c => c.key === 'email_password')?.value || '',
+              recipient: confList.find(c => c.key === 'email_recipient')?.value || ''
+            });
+          }
         }
       } else {
         const res = await fetch(endpoints[activeTab], {
@@ -56,20 +67,27 @@ export default function SettingsView() {
     
     if (activeTab === 'telegram') {
       try {
-        await fetch('http://127.0.0.1:8000/config', {
-          method: 'PUT',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: 'telegram_bot_token', value: telegramForm.bot_token })
-        });
-        await fetch('http://127.0.0.1:8000/config', {
-          method: 'PUT',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: 'telegram_chat_id', value: telegramForm.chat_id })
-        });
+        await fetch('http://127.0.0.1:8000/config', { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'telegram_bot_token', value: telegramForm.bot_token }) });
+        await fetch('http://127.0.0.1:8000/config', { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'telegram_chat_id', value: telegramForm.chat_id }) });
         alert("Configuración de Telegram guardada correctamente");
-      } catch (err) {
-        console.error(err);
-      }
+      } catch (err) { console.error(err); }
+      return;
+    }
+
+    if (activeTab === 'email') {
+      try {
+        const configs = [
+          { key: 'email_smtp_server', value: emailForm.smtp_server },
+          { key: 'email_port', value: emailForm.port },
+          { key: 'email_user', value: emailForm.user },
+          { key: 'email_password', value: emailForm.password },
+          { key: 'email_recipient', value: emailForm.recipient }
+        ];
+        for (const cfg of configs) {
+          await fetch('http://127.0.0.1:8000/config', { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
+        }
+        alert("Configuración de Correo guardada correctamente");
+      } catch (err) { console.error(err); }
       return;
     }
 
@@ -134,7 +152,11 @@ export default function SettingsView() {
           <button 
             style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', color: activeTab === 'telegram' ? 'var(--primary)' : 'var(--text-muted)', borderBottom: activeTab === 'telegram' ? '2px solid var(--primary)' : '2px solid transparent', cursor: 'pointer' }}
             onClick={() => setActiveTab('telegram')}
-          >Integraciones (Telegram)</button>
+          >Telegram</button>
+          <button 
+            style={{ padding: '0.5rem 1rem', background: 'none', border: 'none', color: activeTab === 'email' ? 'var(--primary)' : 'var(--text-muted)', borderBottom: activeTab === 'email' ? '2px solid var(--primary)' : '2px solid transparent', cursor: 'pointer' }}
+            onClick={() => setActiveTab('email')}
+          >Email</button>
         </div>
 
         {loading ? <p>Cargando datos...</p> : (
@@ -159,6 +181,35 @@ export default function SettingsView() {
                   />
                 </div>
                 <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>Guardar Integración</button>
+              </form>
+            </div>
+          ) : activeTab === 'email' ? (
+            <div style={{ maxWidth: '500px' }}>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+                Configura los parámetros SMTP para recibir reportes de calidad por correo electrónico.
+              </p>
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Servidor SMTP</label>
+                  <input type="text" placeholder="smtp.gmail.com" required value={emailForm.smtp_server} onChange={e => setEmailForm({...emailForm, smtp_server: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Puerto SMTP</label>
+                  <input type="number" placeholder="587" required value={emailForm.port} onChange={e => setEmailForm({...emailForm, port: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Usuario (Correo)</label>
+                  <input type="email" placeholder="tu-correo@gmail.com" required value={emailForm.user} onChange={e => setEmailForm({...emailForm, user: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Contraseña (App Password)</label>
+                  <input type="password" placeholder="••••••••" required value={emailForm.password} onChange={e => setEmailForm({...emailForm, password: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Correo Destino (Alertas)</label>
+                  <input type="email" placeholder="jefe-planta@empresa.com" required value={emailForm.recipient} onChange={e => setEmailForm({...emailForm, recipient: e.target.value})} />
+                </div>
+                <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>Guardar Integración SMTP</button>
               </form>
             </div>
           ) : (
@@ -195,7 +246,7 @@ export default function SettingsView() {
         )}
       </div>
 
-      {activeTab !== 'telegram' && (
+      {(activeTab !== 'telegram' && activeTab !== 'email') && (
         <div className="glass-panel" style={{ padding: '2rem', height: 'fit-content' }}>
           <h3 style={{ marginBottom: '1rem' }}>Añadir Registro</h3>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

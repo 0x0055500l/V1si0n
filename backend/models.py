@@ -21,6 +21,7 @@ class User(Base):
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
     role_id = Column(Integer, ForeignKey("roles.id"))
+    dashboard_config = Column(String, default='{}')
 
     role = relationship("Role", back_populates="users")
     scans = relationship("ScanLog", back_populates="user")

@@ -28,9 +28,9 @@ export default function SettingsView() {
   const [pendingAction, setPendingAction] = useState(null); // { type: 'save' | 'delete', payload: any }
 
   const endpoints = {
-    pcb: 'http://127.0.0.1:8000/pcb-models',
-    line: 'http://127.0.0.1:8000/production-lines',
-    defect: 'http://127.0.0.1:8000/defects'
+    pcb: `http://${window.location.hostname}:8000/pcb-models`,
+    line: `http://${window.location.hostname}:8000/production-lines`,
+    defect: `http://${window.location.hostname}:8000/defects`
   };
 
   const fetchData = async () => {
@@ -39,7 +39,7 @@ export default function SettingsView() {
       const token = localStorage.getItem('access_token');
       
       if (activeTab === 'telegram' || activeTab === 'email') {
-        const res = await fetch('http://127.0.0.1:8000/config', { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`http://${window.location.hostname}:8000/config`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) {
           const confList = await res.json();
           if (activeTab === 'telegram') {
@@ -56,7 +56,7 @@ export default function SettingsView() {
               recipient: confList.find(c => c.key === 'email_recipient')?.value || ''
             });
             // Fetch users for the modal
-            const uRes = await fetch('http://127.0.0.1:8000/users', { headers: { 'Authorization': `Bearer ${token}` } });
+            const uRes = await fetch(`http://${window.location.hostname}:8000/users`, { headers: { 'Authorization': `Bearer ${token}` } });
             if (uRes.ok) setSystemUsers(await uRes.json());
           }
         }
@@ -118,8 +118,8 @@ export default function SettingsView() {
     
     if (activeTab === 'telegram') {
       try {
-        await fetch('http://127.0.0.1:8000/config', { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'telegram_bot_token', value: telegramForm.bot_token }) });
-        await fetch('http://127.0.0.1:8000/config', { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'telegram_chat_id', value: telegramForm.chat_id }) });
+        await fetch(`http://${window.location.hostname}:8000/config`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'telegram_bot_token', value: telegramForm.bot_token }) });
+        await fetch(`http://${window.location.hostname}:8000/config`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'telegram_chat_id', value: telegramForm.chat_id }) });
         alert("Configuración de Telegram guardada correctamente");
       } catch (err) { console.error(err); }
       return;
@@ -135,7 +135,7 @@ export default function SettingsView() {
           { key: 'email_recipient', value: emailForm.recipient }
         ];
         for (const cfg of configs) {
-          await fetch('http://127.0.0.1:8000/config', { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
+          await fetch(`http://${window.location.hostname}:8000/config`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
         }
         alert("Configuración de Correo guardada correctamente");
       } catch (err) { console.error(err); }

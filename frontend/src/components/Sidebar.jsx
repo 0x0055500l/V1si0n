@@ -49,7 +49,7 @@ export default function Sidebar({ user, role, onLogout }) {
   const fetchNotifications = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      const res = await fetch('http://127.0.0.1:8000/notifications', {
+      const res = await fetch(`http://${window.location.hostname}:8000/notifications`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -69,7 +69,7 @@ export default function Sidebar({ user, role, onLogout }) {
   const handleRead = async (id) => {
     try {
       const token = localStorage.getItem('access_token');
-      await fetch(`http://127.0.0.1:8000/notifications/${id}/read`, {
+      await fetch(`http://${window.location.hostname}:8000/notifications/${id}/read`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });

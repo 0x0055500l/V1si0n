@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Upload, MessageSquare } from 'lucide-react';
+import { Camera, Upload, MessageSquare, Video, StopCircle } from 'lucide-react';
 import { useLang, t } from '../i18n';
 
 export default function ScannerView({ user }) {
@@ -12,7 +12,14 @@ export default function ScannerView({ user }) {
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  
+  // States for Camera & Live Mode
   const [useCamera, setUseCamera] = useState(false);
+  const [isLiveMode, setIsLiveMode] = useState(false);
+  
+  const wsRef = useRef(null);
+  const liveIntervalRef = useRef(null);
+
   const navigate = useNavigate();
 
   const [pcbModels, setPcbModels] = useState([]);
@@ -27,8 +34,8 @@ export default function ScannerView({ user }) {
         const headers = { 'Authorization': `Bearer ${token}` };
         
         const [modelsRes, linesRes] = await Promise.all([
-          fetch('http://127.0.0.1:8000/pcb-models', { headers }),
-          fetch('http://127.0.0.1:8000/production-lines', { headers })
+          fetch(`http://${window.location.hostname}:8000/pcb-models`, { headers }),
+          fetch(`http://${window.location.hostname}:8000/production-lines`, { headers })
         ]);
 
         if (modelsRes.ok) setPcbModels(await modelsRes.json());
@@ -38,6 +45,11 @@ export default function ScannerView({ user }) {
       }
     };
     fetchCatalogs();
+    
+    // Cleanup on unmount
+    return () => {
+      stopCameraAndLive();
+    };
   }, []);
 
   const handleImageUpload = (e) => {
@@ -50,18 +62,60 @@ export default function ScannerView({ user }) {
     }
   };
 
-  const startCamera = async () => {
+  const startCamera = async (live = false) => {
     setUseCamera(true);
+    setIsLiveMode(live);
     setImage(null);
     setImageFile(null);
+    setResults(null);
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        
+        if (live) {
+          // Initialize WebSocket
+          wsRef.current = new WebSocket(`ws://${window.location.hostname}:8000/ws/live-scan`);
+          
+          wsRef.current.onopen = () => {
+            console.log('Live Scan WebSocket connected');
+            // Start capturing frames at 10 FPS (every 100ms)
+            liveIntervalRef.current = setInterval(captureLiveFrame, 100);
+          };
+          
+          wsRef.current.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.error) {
+              console.error(data.error);
+              return;
+            }
+            setResults(data);
+          };
+          
+          wsRef.current.onclose = () => {
+            console.log('Live Scan WebSocket disconnected');
+          };
+        }
+      }
     } catch (err) {
       console.error(err);
       alert("No se pudo acceder a la cámara.");
       setUseCamera(false);
+      setIsLiveMode(false);
     }
+  };
+
+  const captureLiveFrame = () => {
+    if (!videoRef.current || !canvasRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    
+    const context = canvasRef.current.getContext('2d');
+    canvasRef.current.width = videoRef.current.videoWidth;
+    canvasRef.current.height = videoRef.current.videoHeight;
+    context.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+    
+    const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.6); // 60% quality for performance
+    wsRef.current.send(dataUrl);
   };
 
   const captureImage = () => {
@@ -77,16 +131,27 @@ export default function ScannerView({ user }) {
       setImage(URL.createObjectURL(file));
       setResults(null);
       
-      const stream = videoRef.current.srcObject;
-      if (stream) stream.getTracks().forEach(track => track.stop());
-      setUseCamera(false);
+      stopCameraAndLive();
     }, 'image/jpeg');
   };
 
-  const cancelCamera = () => {
+  const stopCameraAndLive = () => {
+    // Clear live interval
+    if (liveIntervalRef.current) {
+      clearInterval(liveIntervalRef.current);
+      liveIntervalRef.current = null;
+    }
+    // Close WebSocket
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    // Stop camera stream
     const stream = videoRef.current?.srcObject;
     if (stream) stream.getTracks().forEach(track => track.stop());
+    
     setUseCamera(false);
+    setIsLiveMode(false);
   };
 
   const handleAnalyze = async () => {
@@ -103,7 +168,7 @@ export default function ScannerView({ user }) {
       formData.append('production_line_id', selectedLine);
 
       const token = localStorage.getItem('access_token');
-      const res = await fetch('http://127.0.0.1:8000/predict', {
+      const res = await fetch(`http://${window.location.hostname}:8000/predict`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -160,10 +225,15 @@ export default function ScannerView({ user }) {
               <button onClick={() => fileInputRef.current.click()} className="btn btn-secondary" style={{ flex: 1, display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center' }}>
                 <Upload size={18} /> {t(lang, 'upload_img')}
               </button>
-              <button onClick={startCamera} className="btn btn-secondary" style={{ flex: 1, display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => startCamera(false)} className="btn btn-secondary" style={{ flex: 1, display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center' }}>
                 <Camera size={18} /> {t(lang, 'use_camera')}
               </button>
             </div>
+            
+            <button onClick={() => startCamera(true)} className="btn btn-primary" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center', background: 'var(--success)' }}>
+              <Video size={18} /> {t(lang, 'live_scan')}
+            </button>
+            
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -174,39 +244,62 @@ export default function ScannerView({ user }) {
           </div>
         ) : (
           <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <video ref={videoRef} autoPlay playsInline style={{ width: '100%', borderRadius: '8px', border: '1px solid var(--surface-border)' }} />
+            
+            <div style={{ position: 'relative', width: '100%', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--surface-border)' }}>
+              <video ref={videoRef} autoPlay playsInline style={{ width: '100%', display: 'block' }} />
+              
+              {/* Overlay para Bounding Boxes en Vivo */}
+              {isLiveMode && results && results.defects && results.defects.map((defect, idx) => (
+                <div key={idx} style={{ position: 'absolute', border: '2px solid var(--danger)', top: `${defect.bbox[1] * 100}%`, left: `${defect.bbox[0] * 100}%`, width: `${(defect.bbox[2]-defect.bbox[0]) * 100}%`, height: `${(defect.bbox[3]-defect.bbox[1]) * 100}%`, background: 'rgba(239, 68, 68, 0.2)', pointerEvents: 'none' }}>
+                   <span style={{ position: 'absolute', top: '-24px', left: '-2px', background: 'var(--danger)', color: 'white', padding: '2px 6px', fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                     {defect.type} ({Math.round(defect.confidence * 100)}%)
+                   </span>
+                </div>
+              ))}
+            </div>
+            
             <canvas ref={canvasRef} style={{ display: 'none' }} />
+            
             <div style={{ display: 'flex', gap: '1rem' }}>
-              <button onClick={captureImage} className="btn btn-primary" style={{ flex: 1, display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center' }}>
-                <Camera size={18} /> {t(lang, 'capture')}
-              </button>
-              <button onClick={cancelCamera} className="btn btn-secondary" style={{ flex: 1 }}>
-                {t(lang, 'cancel')}
+              {!isLiveMode ? (
+                <button onClick={captureImage} className="btn btn-primary" style={{ flex: 1, display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center' }}>
+                  <Camera size={18} /> {t(lang, 'capture')}
+                </button>
+              ) : (
+                <button disabled className="btn btn-primary" style={{ flex: 1, display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-bg)' }}>
+                  <Video size={18} /> {t(lang, 'scanning_live')}
+                </button>
+              )}
+              
+              <button onClick={stopCameraAndLive} className="btn btn-secondary" style={{ flex: 1, display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center' }}>
+                <StopCircle size={18} /> {isLiveMode ? t(lang, 'stop_live') : t(lang, 'cancel')}
               </button>
             </div>
           </div>
         )}
 
-        <button 
-          className="btn btn-primary" 
-          disabled={!image || analyzing || !selectedModel || !selectedLine} 
-          onClick={handleAnalyze}
-          style={{ width: '100%' }}
-        >
-          {analyzing ? t(lang, 'analyzing') : t(lang, 'analyze_btn')}
-        </button>
+        {!isLiveMode && (
+          <button 
+            className="btn btn-primary" 
+            disabled={!image || analyzing || !selectedModel || !selectedLine} 
+            onClick={handleAnalyze}
+            style={{ width: '100%', marginTop: '1rem' }}
+          >
+            {analyzing ? t(lang, 'analyzing') : t(lang, 'analyze_btn')}
+          </button>
+        )}
       </section>
 
       {/* Results Section */}
       <section className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'fit-content' }}>
-        <h3>{t(lang, 'results_title')}</h3>
+        <h3>{isLiveMode ? t(lang, 'live_results') : t(lang, 'results_title')}</h3>
         
-        {image ? (
+        {image && !isLiveMode ? (
           <div style={{ position: 'relative', width: '100%', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--surface-border)' }}>
             <img src={image} alt="Preview" style={{ width: '100%', display: 'block' }} />
             
             {results && !analyzing && results.defects.map((defect, idx) => (
-              <div key={idx} style={{ position: 'absolute', border: '2px solid var(--danger)', top: `${defect.bbox[1] * 100}%`, left: `${defect.bbox[0] * 100}%`, width: `${(defect.bbox[2]-defect.bbox[0]) * 100}%`, height: `${(defect.bbox[3]-defect.bbox[1]) * 100}%`, background: 'rgba(239, 68, 68, 0.2)' }}>
+              <div key={idx} style={{ position: 'absolute', border: '2px solid var(--danger)', top: `${defect.bbox[1] * 100}%`, left: `${defect.bbox[0] * 100}%`, width: `${(defect.bbox[2]-defect.bbox[0]) * 100}%`, height: `${(defect.bbox[3]-defect.bbox[1]) * 100}%`, background: 'rgba(239, 68, 68, 0.2)', pointerEvents: 'none' }}>
                  <span style={{ position: 'absolute', top: '-24px', left: '-2px', background: 'var(--danger)', color: 'white', padding: '2px 6px', fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                    {defect.type} ({Math.round(defect.confidence * 100)}%)
                  </span>
@@ -214,9 +307,11 @@ export default function ScannerView({ user }) {
             ))}
           </div>
         ) : (
-          <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--surface-border)', borderRadius: '8px', color: 'var(--text-muted)' }}>
-            {t(lang, 'waiting_img')}
-          </div>
+          !isLiveMode && (
+            <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--surface-border)', borderRadius: '8px', color: 'var(--text-muted)' }}>
+              {t(lang, 'waiting_img')}
+            </div>
+          )
         )}
 
         {results && !analyzing && (
@@ -236,16 +331,19 @@ export default function ScannerView({ user }) {
                       </li>
                     ))}
                   </ul>
-                  <button 
-                    onClick={() => {
-                      const defectsList = results.defects.map(d => d.type).join(', ');
-                      navigate('/chat', { state: { initialPrompt: `He escaneado una placa y detecté: ${defectsList}. ¿Me puedes explicar qué significa esto y cómo puedo solucionarlo en la línea de producción?` } });
-                    }}
-                    className="btn" 
-                    style={{ marginTop: '1rem', width: '100%', display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', border: '1px solid rgba(99, 102, 241, 0.2)' }}
-                  >
-                    <MessageSquare size={18} /> {t(lang, 'ask_vision')}
-                  </button>
+                  
+                  {!isLiveMode && (
+                    <button 
+                      onClick={() => {
+                        const defectsList = results.defects.map(d => d.type).join(', ');
+                        navigate('/chat', { state: { initialPrompt: `He escaneado una placa y detecté: ${defectsList}. ¿Me puedes explicar qué significa esto y cómo puedo solucionarlo en la línea de producción?` } });
+                      }}
+                      className="btn" 
+                      style={{ marginTop: '1rem', width: '100%', display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', border: '1px solid rgba(99, 102, 241, 0.2)' }}
+                    >
+                      <MessageSquare size={18} /> {t(lang, 'ask_vision')}
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -254,6 +352,12 @@ export default function ScannerView({ user }) {
                 <span>{t(lang, 'no_defects')}</span>
               </div>
             )}
+          </div>
+        )}
+        
+        {isLiveMode && !results && (
+          <div style={{ padding: '1rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+            {t(lang, 'scanning_live')}
           </div>
         )}
       </section>

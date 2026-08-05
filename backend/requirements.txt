@@ -13,3 +13,4 @@ ollama
 requests
 ultralytics
 faster-whisper
+websockets

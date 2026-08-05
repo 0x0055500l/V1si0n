@@ -30,7 +30,7 @@ export default function UsersView() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      const res = await fetch('http://127.0.0.1:8000/users', {
+      const res = await fetch(`http://${window.location.hostname}:8000/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -54,7 +54,7 @@ export default function UsersView() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('access_token');
-      const res = await fetch('http://127.0.0.1:8000/users', {
+      const res = await fetch(`http://${window.location.hostname}:8000/users`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -99,7 +99,7 @@ export default function UsersView() {
       const token = localStorage.getItem('access_token');
       
       if (actionType === 'delete') {
-        const res = await fetch(`http://127.0.0.1:8000/users/${selectedUser.id}`, {
+        const res = await fetch(`http://${window.location.hostname}:8000/users/${selectedUser.id}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -110,7 +110,7 @@ export default function UsersView() {
           alert(d.detail);
         }
       } else if (actionType === 'edit') {
-        const res = await fetch(`http://127.0.0.1:8000/users/${selectedUser.id}`, {
+        const res = await fetch(`http://${window.location.hostname}:8000/users/${selectedUser.id}`, {
           method: 'PUT',
           headers: { 
             'Authorization': `Bearer ${token}`,

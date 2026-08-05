@@ -15,7 +15,7 @@ export default function PasswordModal({ isOpen, onClose, onSuccess, title, lang 
     setError(null);
     try {
       const token = localStorage.getItem('access_token');
-      const res = await fetch('http://127.0.0.1:8000/verify-password', {
+      const res = await fetch(`http://${window.location.hostname}:8000/verify-password`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

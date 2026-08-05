@@ -31,7 +31,7 @@ export default function ChatWidget() {
   const loadSessions = async () => {
     const token = localStorage.getItem('access_token');
     try {
-      const res = await fetch('http://127.0.0.1:8000/chat/sessions', { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch(`http://${window.location.hostname}:8000/chat/sessions`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
         setSessions(data);
@@ -49,7 +49,7 @@ export default function ChatWidget() {
     setActiveSessionId(sessionId);
     const token = localStorage.getItem('access_token');
     try {
-      const res = await fetch(`http://127.0.0.1:8000/chat/sessions/${sessionId}/history`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch(`http://${window.location.hostname}:8000/chat/sessions/${sessionId}/history`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) {
         const history = await res.json();
         setMessages(history.length ? history : [{ role: 'assistant', content: 'Chat restaurado.' }]);
@@ -62,7 +62,7 @@ export default function ChatWidget() {
     const fetchPrompts = async () => {
       const token = localStorage.getItem('access_token');
       try {
-        const pRes = await fetch('http://127.0.0.1:8000/prompts', { headers: { 'Authorization': `Bearer ${token}` } });
+        const pRes = await fetch(`http://${window.location.hostname}:8000/prompts`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (pRes.ok) setPrompts(await pRes.json());
       } catch (err) {}
     };
@@ -108,7 +108,7 @@ export default function ChatWidget() {
 
     try {
       const token = localStorage.getItem('access_token');
-      const res = await fetch('http://127.0.0.1:8000/chat', {
+      const res = await fetch(`http://${window.location.hostname}:8000/chat`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -153,7 +153,7 @@ export default function ChatWidget() {
         const token = localStorage.getItem('access_token');
         setLoading(true);
         try {
-          const res = await fetch('http://127.0.0.1:8000/speech-to-text', {
+          const res = await fetch(`http://${window.location.hostname}:8000/speech-to-text`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
             body: formData

@@ -19,7 +19,7 @@ export default function HistoryView() {
     const fetchLogs = async () => {
       try {
         const token = localStorage.getItem('access_token');
-        const res = await fetch('http://127.0.0.1:8000/scans', {
+        const res = await fetch(`http://${window.location.hostname}:8000/scans`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {

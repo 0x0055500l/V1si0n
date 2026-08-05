@@ -23,7 +23,7 @@ export default function StatsView() {
       try {
         const token = localStorage.getItem('access_token');
         // Fetch User Config
-        const userRes = await fetch('http://127.0.0.1:8000/users/me', { headers: { 'Authorization': `Bearer ${token}` } });
+        const userRes = await fetch(`http://${window.location.hostname}:8000/users/me`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (userRes.ok) {
           const userData = await userRes.json();
           if (userData.dashboard_config) {
@@ -34,7 +34,7 @@ export default function StatsView() {
           }
         }
         // Fetch Stats
-        const statsRes = await fetch('http://127.0.0.1:8000/stats', { headers: { 'Authorization': `Bearer ${token}` } });
+        const statsRes = await fetch(`http://${window.location.hostname}:8000/stats`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (statsRes.ok) {
           setStats(await statsRes.json());
         }
@@ -49,7 +49,7 @@ export default function StatsView() {
     setConfig(newConfig);
     try {
       const token = localStorage.getItem('access_token');
-      await fetch('http://127.0.0.1:8000/users/me/dashboard_config', {
+      await fetch(`http://${window.location.hostname}:8000/users/me/dashboard_config`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ dashboard_config: JSON.stringify(newConfig) })

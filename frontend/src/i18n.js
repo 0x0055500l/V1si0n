@@ -94,7 +94,12 @@ export const translations = {
     confidence: "de confianza",
     ask_vision: "Consultar a V1si0n sobre esto",
     ok_part: "Pieza OK",
-    no_defects: "Sin defectos"
+    no_defects: "Sin defectos",
+    live_scan: "Iniciar Escaneo en Vivo",
+    stop_live: "Detener Escaneo en Vivo",
+    live_mode: "Modo en Vivo",
+    scanning_live: "Escaneando en vivo...",
+    live_results: "Resultados en Vivo"
   },
   en: {
     dashboard: "Dashboard",
@@ -188,7 +193,12 @@ export const translations = {
     confidence: "confidence",
     ask_vision: "Ask V1si0n about this",
     ok_part: "OK Part",
-    no_defects: "No defects"
+    no_defects: "No defects",
+    live_scan: "Start Live Scan",
+    stop_live: "Stop Live Scan",
+    live_mode: "Live Mode",
+    scanning_live: "Live scanning...",
+    live_results: "Live Results"
   }
 };
 

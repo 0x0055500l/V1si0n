@@ -20,7 +20,7 @@ export default function Login({ onLogin }) {
     
     try {
       if (isRegistering) {
-        const response = await fetch('http://127.0.0.1:8000/register', {
+        const response = await fetch(`http://${window.location.hostname}:8000/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, email, password, role_id: 2 }) // 2 = inspector default
@@ -37,7 +37,7 @@ export default function Login({ onLogin }) {
         return;
       }
 
-      const response = await fetch('http://127.0.0.1:8000/token', {
+      const response = await fetch(`http://${window.location.hostname}:8000/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -58,7 +58,7 @@ export default function Login({ onLogin }) {
       const data = await response.json();
       localStorage.setItem('access_token', data.access_token);
       
-      const userRes = await fetch('http://127.0.0.1:8000/users/me', {
+      const userRes = await fetch(`http://${window.location.hostname}:8000/users/me`, {
         headers: { 'Authorization': `Bearer ${data.access_token}` }
       });
       const userData = await userRes.json();

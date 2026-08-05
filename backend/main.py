@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Request, Form
+from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Request, Form, WebSocket, WebSocketDisconnect
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -19,6 +19,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from PIL import Image
+import base64
 
 try:
     from faster_whisper import WhisperModel
@@ -617,4 +618,63 @@ async def speech_to_text(audio: UploadFile = File(...), current_user: models.Use
     except Exception as e:
         if os.path.exists(temp_file):
             os.remove(temp_file)
-        raise HTTPException(status_code=500, detail=f"Error transcribiendo audio: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en transcripción: {str(e)}")
+
+@app.websocket("/ws/live-scan")
+async def websocket_live_scan(websocket: WebSocket):
+    await websocket.accept()
+    if not YOLO_AVAILABLE or not os.path.exists("best.pt"):
+        await websocket.send_json({"error": "Modelo YOLOv8 no disponible"})
+        await websocket.close()
+        return
+
+    model = YOLO("best.pt")
+    
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data.startswith("data:image"):
+                data = data.split(",")[1]
+            
+            image_bytes = base64.b64decode(data)
+            image = Image.open(io.BytesIO(image_bytes))
+            
+            results = model(image, verbose=False)
+            
+            defects = []
+            status_part = "OK"
+            
+            if len(results) > 0:
+                result = results[0]
+                img_width, img_height = image.size
+                for box in result.boxes:
+                    cls_id = int(box.cls[0])
+                    conf = float(box.conf[0])
+                    class_name = model.names[cls_id]
+                    
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
+                    defects.append({
+                        "type": class_name,
+                        "confidence": conf,
+                        "bbox": [x1 / img_width, y1 / img_height, x2 / img_width, y2 / img_height]
+                    })
+            
+            if len(defects) > 0:
+                status_part = "Defectuoso"
+                
+            await websocket.send_json({
+                "status": status_part,
+                "defects": defects
+            })
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        print(f"Error in live scan: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

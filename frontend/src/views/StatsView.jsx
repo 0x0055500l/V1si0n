@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { Settings2, CheckCircle2, XCircle } from 'lucide-react';
+import { t, useLang } from '../i18n';
 
 export default function StatsView() {
+  const lang = useLang();
   const [stats, setStats] = useState({ 
     total: 0, defectuoso: 0, ok: 0, 
     distribution: [], line_performance: [], recent_scans: [] 
@@ -63,8 +65,8 @@ export default function StatsView() {
   };
 
   const pieGeneral = [
-    { name: 'Defectuosos', value: stats.defectuoso },
-    { name: 'Aprobados (OK)', value: stats.ok },
+    { name: t(lang, 'defective'), value: stats.defectuoso },
+    { name: t(lang, 'ok'), value: stats.ok },
   ];
   const COLORS_GEN = ['#ef4444', '#10b981'];
   const COLORS_DET = ['#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#06b6d4', '#f43f5e'];
@@ -72,9 +74,9 @@ export default function StatsView() {
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>Dashboard Analítico Modular</h2>
+        <h2>{t(lang, 'stats_title')}</h2>
         <button className="btn btn-secondary" onClick={() => setShowConfigMenu(!showConfigMenu)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Settings2 size={18} /> Personalizar Vista
+          <Settings2 size={18} /> {t(lang, 'customize_view')}
         </button>
       </div>
 
@@ -85,35 +87,35 @@ export default function StatsView() {
               <input type="checkbox" checked={config.showCards} onChange={() => toggleWidget('showCards')} />
               <span className="toggle-slider"></span>
             </div>
-            Tarjetas Resumen
+            {t(lang, 'summary_cards')}
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
             <div className="toggle-switch">
               <input type="checkbox" checked={config.showGeneralPie} onChange={() => toggleWidget('showGeneralPie')} />
               <span className="toggle-slider"></span>
             </div>
-            Proporción General
+            {t(lang, 'general_proportion')}
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
             <div className="toggle-switch">
               <input type="checkbox" checked={config.showDetailedPie} onChange={() => toggleWidget('showDetailedPie')} />
               <span className="toggle-slider"></span>
             </div>
-            Distribución de Defectos
+            {t(lang, 'defects_by_type')}
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
             <div className="toggle-switch">
               <input type="checkbox" checked={config.showLineBar} onChange={() => toggleWidget('showLineBar')} />
               <span className="toggle-slider"></span>
             </div>
-            Desempeño por Línea
+            {t(lang, 'line_performance')}
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
             <div className="toggle-switch">
               <input type="checkbox" checked={config.showRecent} onChange={() => toggleWidget('showRecent')} />
               <span className="toggle-slider"></span>
             </div>
-            Historial Reciente
+            {t(lang, 'recent_scans')}
           </label>
         </div>
       )}
@@ -121,15 +123,15 @@ export default function StatsView() {
       {config.showCards && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
           <div className="glass-panel" style={{ borderLeft: '4px solid var(--primary)' }}>
-            <h3 style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>Total Escaneos</h3>
+            <h3 style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>{t(lang, 'total_scans')}</h3>
             <p className="text-gradient" style={{ fontSize: '3rem', fontWeight: 'bold', margin: '0.5rem 0' }}>{stats.total}</p>
           </div>
           <div className="glass-panel" style={{ borderLeft: '4px solid var(--danger)' }}>
-            <h3 style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>Placas Defectuosas</h3>
+            <h3 style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>{t(lang, 'defective')}</h3>
             <p style={{ color: 'var(--danger)', fontSize: '3rem', fontWeight: 'bold', margin: '0.5rem 0' }}>{stats.defectuoso}</p>
           </div>
           <div className="glass-panel" style={{ borderLeft: '4px solid #10b981' }}>
-            <h3 style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>Placas Aprobadas</h3>
+            <h3 style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>{t(lang, 'ok')}</h3>
             <p style={{ color: '#10b981', fontSize: '3rem', fontWeight: 'bold', margin: '0.5rem 0' }}>{stats.ok}</p>
           </div>
         </div>
@@ -139,7 +141,7 @@ export default function StatsView() {
         
         {config.showGeneralPie && (
           <div className="glass-panel" style={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
-            <h3>Proporción General</h3>
+            <h3>{t(lang, 'general_proportion')}</h3>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={pieGeneral} cx="50%" cy="50%" innerRadius={80} outerRadius={120} paddingAngle={5} dataKey="value" label>
@@ -154,9 +156,9 @@ export default function StatsView() {
 
         {config.showDetailedPie && (
           <div className="glass-panel" style={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
-            <h3>Distribución de Defectos (Top)</h3>
+            <h3>{t(lang, 'defects_by_type')}</h3>
             {stats.distribution.length === 0 ? (
-              <div style={{ margin: 'auto', color: 'var(--text-muted)' }}>No hay defectos registrados aún.</div>
+              <div style={{ margin: 'auto', color: 'var(--text-muted)' }}>{t(lang, 'no_defects_yet')}</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -173,7 +175,7 @@ export default function StatsView() {
 
         {config.showLineBar && (
           <div className="glass-panel" style={{ height: '400px', display: 'flex', flexDirection: 'column', gridColumn: '1 / -1' }}>
-            <h3>Desempeño por Línea de Producción</h3>
+            <h3>{t(lang, 'line_performance')}</h3>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats.line_performance} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -181,8 +183,8 @@ export default function StatsView() {
                 <YAxis stroke="var(--text-muted)" />
                 <Tooltip contentStyle={{ backgroundColor: 'rgba(15,23,42,0.9)', border: '1px solid var(--surface-border)' }} />
                 <Legend />
-                <Bar dataKey="ok" stackId="a" fill="#10b981" name="OK" />
-                <Bar dataKey="defectuoso" stackId="a" fill="#ef4444" name="Defectuoso" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="ok" stackId="a" fill="#10b981" name={t(lang, 'ok')} />
+                <Bar dataKey="defectuoso" stackId="a" fill="#ef4444" name={t(lang, 'defective')} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -190,36 +192,38 @@ export default function StatsView() {
 
         {config.showRecent && (
           <div className="glass-panel" style={{ gridColumn: '1 / -1' }}>
-            <h3>Últimos 5 Escaneos</h3>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginTop: '1rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--surface-border)', color: 'var(--text-muted)' }}>
-                  <th style={{ padding: '1rem' }}>ID</th>
-                  <th style={{ padding: '1rem' }}>Archivo</th>
-                  <th style={{ padding: '1rem' }}>Estado</th>
-                  <th style={{ padding: '1rem' }}>Fecha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.recent_scans.map(scan => (
-                  <tr key={scan.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '1rem' }}>#{scan.id}</td>
-                    <td style={{ padding: '1rem' }}>{scan.filename}</td>
-                    <td style={{ padding: '1rem' }}>
-                      <span style={{ 
-                        padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.85rem', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-                        background: scan.status === 'OK' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                        color: scan.status === 'OK' ? '#10b981' : '#ef4444'
-                      }}>
-                        {scan.status === 'OK' ? <CheckCircle2 size={14}/> : <XCircle size={14}/>} {scan.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>{new Date(scan.timestamp).toLocaleString()}</td>
+            <h3>{t(lang, 'recent_scans')}</h3>
+            <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--surface-border)', color: 'var(--text-muted)' }}>
+                    <th style={{ padding: '1rem' }}>ID</th>
+                    <th style={{ padding: '1rem' }}>{t(lang, 'date')}</th>
+                    <th style={{ padding: '1rem' }}>{t(lang, 'file')}</th>
+                    <th style={{ padding: '1rem' }}>{t(lang, 'status')}</th>
                   </tr>
-                ))}
-                {stats.recent_scans.length === 0 && <tr><td colSpan="4" style={{ padding: '1rem', textAlign: 'center' }}>No hay escaneos recientes</td></tr>}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {stats.recent_scans.map(scan => (
+                    <tr key={scan.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '1rem' }}>#{scan.id}</td>
+                      <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>{new Date(scan.timestamp).toLocaleString()}</td>
+                      <td style={{ padding: '1rem', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{scan.filename}</td>
+                      <td style={{ padding: '1rem' }}>
+                        <span style={{ 
+                          padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.85rem', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                          background: scan.status === 'OK' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: scan.status === 'OK' ? '#10b981' : '#ef4444'
+                        }}>
+                          {scan.status === 'OK' ? <CheckCircle2 size={14}/> : <XCircle size={14}/>} {scan.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {stats.recent_scans.length === 0 && <tr><td colSpan="4" style={{ padding: '1rem', textAlign: 'center' }}>No hay escaneos recientes</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

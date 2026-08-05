@@ -15,12 +15,10 @@ def download_dataset():
     from roboflow import Roboflow
     print("Descargando dataset desde Roboflow...")
     
-    # Ejemplo genérico, el usuario deberá actualizar los parámetros:
-    # Actualizado con tu workspace real
     rf = Roboflow(api_key="vo0bSM9Ki6IbRpOxcbFH")
-    # ATENCIÓN: El nombre de tu proyecto en Roboflow (suele convertirse a minúsculas y guiones)
-    project = rf.workspace("josseth-alejandro").project("pcb_v1si0n")
-    dataset = project.version(1).download("yolov8")
+    project = rf.workspace("josseths-workspace").project("pcb_v1si0n")
+    version = project.version(1)
+    dataset = version.download("yolov8")
     return dataset.location
 
 def train_model(data_path):
@@ -38,8 +36,7 @@ def train_model(data_path):
         epochs=100,
         imgsz=640,
         batch=16,
-        name="v1si0n_pcb_model",
-        device=0 # Usa la GPU local 0. Si no tienes GPU, cambia a device='cpu'
+        name="v1si0n_pcb_model"
     )
     
     print("Entrenamiento completado.")

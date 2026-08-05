@@ -18,6 +18,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=True)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
     role_id = Column(Integer, ForeignKey("roles.id"))
@@ -94,16 +95,30 @@ class ScanDefect(Base):
     defect = relationship("DefectDictionary", back_populates="scan_defects")
 
 
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    title = Column(String, nullable=False)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
+    messages = relationship("ChatHistory", back_populates="session", cascade="all, delete-orphan")
+
+
 class ChatHistory(Base):
     __tablename__ = "chat_histories"
 
     id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("chat_sessions.id", ondelete="CASCADE"))
     user_id = Column(Integer, ForeignKey("users.id"))
     role = Column(String) # 'user' o 'assistant'
     content = Column(Text)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="chats")
+    session = relationship("ChatSession", back_populates="messages")
 
 
 class PromptLibrary(Base):

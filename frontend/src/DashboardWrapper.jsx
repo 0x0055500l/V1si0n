@@ -7,8 +7,24 @@ import UsersView from './views/UsersView';
 import SettingsView from './views/SettingsView';
 import ChatWidget from './components/ChatWidget';
 
-import { Menu } from 'lucide-react';
-import { useState } from 'react';
+import { Menu, Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
+function RealTimeClock() {
+  const [time, setTime] = useState(new Date());
+  
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem', background: 'var(--surface-bg)', padding: '0.5rem 1rem', borderRadius: '8px', width: 'fit-content', border: '1px solid var(--surface-border)' }}>
+      <Clock size={16} />
+      <span>{time.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} - {time.toLocaleTimeString('es-ES')}</span>
+    </div>
+  );
+}
 
 export default function DashboardWrapper({ user, role, onLogout }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -31,6 +47,7 @@ export default function DashboardWrapper({ user, role, onLogout }) {
       </div>
       
       <main className="main-content" style={{ flex: 1, padding: '2rem', overflowY: 'auto', width: '100%' }}>
+        <RealTimeClock />
         <Routes>
           <Route path="/" element={<StatsView />} />
           <Route path="/scanner" element={<ScannerView user={user} />} />

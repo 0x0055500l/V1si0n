@@ -5,6 +5,7 @@
   --bg-color: #0b0f19;
   --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
   --surface-color: rgba(255, 255, 255, 0.03);
+  --surface-bg: #1e293b;
   --surface-border: rgba(255, 255, 255, 0.08);
   
   --primary: #6366f1; /* Indigo */
@@ -33,6 +34,43 @@
   /* Transitions */
   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body.light-mode {
+  --bg-color: #f8fafc;
+  --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  --surface-color: rgba(255, 255, 255, 0.7);
+  --surface-bg: #ffffff;
+  --surface-border: rgba(0, 0, 0, 0.08);
+  
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-glow: rgba(79, 70, 229, 0.3);
+  
+  --secondary: #db2777;
+  
+  --text-main: #0f172a;
+  --text-muted: #475569;
+
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.6);
+  --glass-shadow: 0 8px 32px 0 rgba(30, 41, 59, 0.08);
+}
+
+body.light-mode input, 
+body.light-mode select, 
+body.light-mode textarea {
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--text-main);
+}
+
+body.light-mode .btn-secondary {
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--text-main);
+  border: 1px solid var(--surface-border);
+}
+body.light-mode .btn-secondary:hover {
+  background: rgba(15, 23, 42, 0.1);
 }
 
 * {

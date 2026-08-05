@@ -25,14 +25,17 @@ build/
 
 # Bases de datos y logs
 *.sqlite3
+*.db
 *.log
 
 # YOLOv8 e IA
 runs/
 dataset/
+ai/pcb_V1si0n*/
 *.pt
 !best.pt
 
 # OS generados
 .DS_Store
 Thumbs.db
+

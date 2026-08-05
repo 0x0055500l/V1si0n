@@ -2,11 +2,12 @@
 
 V1si0n es un sistema moderno, responsivo y ultraseguro diseñado para la detección automatizada de defectos en Placas de Circuito Impreso (PCBs) utilizando Inteligencia Artificial (Visión por Computadora).
 
-## 🌟 Nuevas Características (Fase 2)
-- **Dashboard Estadístico:** Gráficas interactivas y dinámicas (basadas en Recharts) que muestran la tasa de éxito y tipos de defectos en tiempo real.
-- **Asistente de IA Local (Chatbot):** Un chatbot integrado conectado a un modelo de lenguaje local (Ollama) entrenado para responder estrictamente a dudas sobre calidad y PCBs, sin salirse del contexto.
-- **Bitácora de Inspecciones:** Registro detallado y persistente en base de datos de cada PCB analizado.
-- **Roles y Gestión de Usuarios (CRUD):** El sistema diferencia entre "Inspectores" (solo operan el escáner) y "Administradores" (pueden crear, editar o eliminar usuarios).
+## 🌟 Nuevas Características (Fase 2 y 3)
+- **Soporte Multilingüe Completo (i18n):** Interfaz disponible 100% en Inglés y Español con cambio en tiempo real.
+- **Sistema de Chat Avanzado (IA Local):** Múltiples sesiones de chat guardadas y un modo "Chat Secreto" autodestructible, protegido por contraseña.
+- **Configuraciones Avanzadas y Seguridad:** Panel de ajustes para parámetros críticos y módulo de usuarios (CRUD) con validación obligatoria de contraseña de administrador para cada cambio.
+- **Dashboard Estadístico Responsivo:** Gráficas interactivas y dinámicas (basadas en Recharts) que muestran la tasa de éxito y tipos de defectos.
+- **Bitácora de Inspecciones con Exportación:** Registro detallado con capacidad de descargar reportes en PDF y Excel, ahora totalmente adaptado y responsivo.
 
 ## 🏗️ Arquitectura del Proyecto
 
@@ -18,7 +19,26 @@ El proyecto está dividido en tres componentes principales para asegurar escalab
 
 ---
 
-## 💻 Inicio Rápido (Desarrollo)
+## 💻 Inicio Rápido (Despliegue con Docker)
+
+La forma más rápida y recomendada de desplegar el entorno completo de V1si0n es mediante **Docker Compose**. Esto levantará automáticamente la Base de Datos, el Backend y el Frontend en contenedores aislados.
+
+Requiere tener [Docker](https://www.docker.com/) instalado en tu sistema.
+
+```bash
+# En la carpeta raíz del proyecto
+docker-compose up --build -d
+```
+Una vez levantado:
+- El **Frontend** estará disponible en: `http://localhost:80` (o simplemente `http://localhost`)
+- El **Backend (API)** estará en: `http://localhost:8000`
+- La **Base de Datos** estará mapeada en el puerto `5432`.
+
+*(Nota: Para que el asistente IA funcione en Docker, debes tener Ollama corriendo localmente. El contenedor ya está configurado para buscar a Ollama en `host.docker.internal`).*
+
+---
+
+## 💻 Inicio Rápido (Desarrollo Local sin Docker)
 
 ### 1. Frontend (Interfaz Web)
 Requiere [Node.js](https://nodejs.org/) instalado.

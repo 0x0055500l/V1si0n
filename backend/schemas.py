@@ -18,10 +18,12 @@ class Role(RoleBase):
 # --- USERS ---
 class UserBase(BaseModel):
     username: str
+    email: Optional[str] = None
     role_id: int = 1
 
 class UserCreate(UserBase):
     password: str
+    email: str
 
 class UserUpdate(BaseModel):
     role_id: Optional[int] = None
@@ -30,6 +32,7 @@ class UserUpdate(BaseModel):
 class User(BaseModel):
     id: int
     username: str
+    email: Optional[str] = None
     is_active: bool
     role: Role
     dashboard_config: Optional[str] = "{}"
@@ -127,14 +130,32 @@ class TokenData(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: Optional[int] = None
+    is_ephemeral: bool = False
+
+class PasswordVerifyRequest(BaseModel):
+    password: str
 
 class ChatResponse(BaseModel):
     response: str
+    session_id: Optional[int] = None
 
 class ChatHistory(BaseModel):
     id: int
+    session_id: Optional[int] = None
     role: str
     content: str
+    timestamp: datetime
+    class Config:
+        from_attributes = True
+
+class ChatSessionCreate(BaseModel):
+    title: str
+
+class ChatSession(BaseModel):
+    id: int
+    user_id: int
+    title: str
     timestamp: datetime
     class Config:
         from_attributes = True

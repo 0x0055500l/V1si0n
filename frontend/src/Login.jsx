@@ -2,9 +2,11 @@ import { useState } from 'react';
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   const handleMouseMove = (e) => {
@@ -17,6 +19,24 @@ export default function Login({ onLogin }) {
     setError(null);
     
     try {
+      if (isRegistering) {
+        const response = await fetch('http://127.0.0.1:8000/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email, password, role_id: 2 }) // 2 = inspector default
+        });
+        
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.detail || 'Error al registrar usuario');
+        }
+        
+        setIsRegistering(false);
+        setError('Registro exitoso. Ahora puedes iniciar sesión.');
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch('http://127.0.0.1:8000/token', {
         method: 'POST',
         headers: {
@@ -38,7 +58,6 @@ export default function Login({ onLogin }) {
       const data = await response.json();
       localStorage.setItem('access_token', data.access_token);
       
-      // Fetch user role
       const userRes = await fetch('http://127.0.0.1:8000/users/me', {
         headers: { 'Authorization': `Bearer ${data.access_token}` }
       });
@@ -72,7 +91,7 @@ export default function Login({ onLogin }) {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {error && (
-            <div style={{ padding: '0.75rem', backgroundColor: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', borderRadius: '8px', fontSize: '0.875rem', border: '1px solid rgba(255, 59, 48, 0.2)' }}>
+            <div style={{ padding: '0.75rem', backgroundColor: error.includes('exitoso') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 59, 48, 0.1)', color: error.includes('exitoso') ? '#10b981' : '#ff3b30', borderRadius: '8px', fontSize: '0.875rem', border: `1px solid ${error.includes('exitoso') ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 59, 48, 0.2)'}` }}>
               {error}
             </div>
           )}
@@ -89,6 +108,21 @@ export default function Login({ onLogin }) {
             />
           </div>
           
+          {isRegistering && (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                Correo Electrónico
+              </label>
+              <input 
+                type="email" 
+                required 
+                placeholder="tu-correo@empresa.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          )}
+          
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
               Contraseña
@@ -103,9 +137,52 @@ export default function Login({ onLogin }) {
           </div>
 
           <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem' }} disabled={loading}>
-            {loading ? 'Verificando credenciales...' : 'Acceder al Sistema'}
+            {loading ? (isRegistering ? 'Registrando...' : 'Verificando credenciales...') : (isRegistering ? 'Registrar Cuenta' : 'Acceder al Sistema')}
           </button>
         </form>
+        
+        <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ 
+            background: 'rgba(0,0,0,0.2)', 
+            padding: '0.25rem', 
+            borderRadius: '24px', 
+            display: 'inline-flex',
+            border: '1px solid var(--surface-border)'
+          }}>
+            <button 
+              type="button" 
+              onClick={() => { setIsRegistering(false); setError(null); }} 
+              style={{ 
+                padding: '0.5rem 1.5rem', 
+                borderRadius: '20px', 
+                border: 'none', 
+                background: !isRegistering ? 'var(--primary)' : 'transparent', 
+                color: !isRegistering ? 'white' : 'var(--text-muted)',
+                fontWeight: !isRegistering ? '600' : '400',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              Iniciar Sesión
+            </button>
+            <button 
+              type="button" 
+              onClick={() => { setIsRegistering(true); setError(null); }} 
+              style={{ 
+                padding: '0.5rem 1.5rem', 
+                borderRadius: '20px', 
+                border: 'none', 
+                background: isRegistering ? 'var(--primary)' : 'transparent', 
+                color: isRegistering ? 'white' : 'var(--text-muted)',
+                fontWeight: isRegistering ? '600' : '400',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              Registro
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -119,18 +119,41 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
 async def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
+@app.post("/verify-password")
+def verify_password_endpoint(req: schemas.PasswordVerifyRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if not auth.verify_password(req.password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Contraseña incorrecta")
+    return {"status": "ok"}
+
 # ================= USER CRUD =================
 @app.get("/users", response_model=List[schemas.User])
 def get_users(db: Session = Depends(get_db), admin: models.User = Depends(get_current_admin)):
     return db.query(models.User).all()
 
+@app.post("/register", response_model=schemas.User)
+def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    if db.query(models.User).filter(models.User.username == user.username).first():
+        raise HTTPException(status_code=400, detail="El usuario ya existe")
+    if db.query(models.User).filter(models.User.email == user.email).first():
+        raise HTTPException(status_code=400, detail="El correo ya está registrado")
+    
+    hashed_password = auth.get_password_hash(user.password)
+    # Default to role_id=2 (inspector) if 1 is admin, or just use user.role_id
+    new_user = models.User(username=user.username, email=user.email, hashed_password=hashed_password, role_id=user.role_id)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
 @app.post("/users", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), admin: models.User = Depends(get_current_admin)):
     if db.query(models.User).filter(models.User.username == user.username).first():
         raise HTTPException(status_code=400, detail="El usuario ya existe")
+    if db.query(models.User).filter(models.User.email == user.email).first():
+        raise HTTPException(status_code=400, detail="El correo ya está registrado")
     
     hashed_password = auth.get_password_hash(user.password)
-    new_user = models.User(username=user.username, hashed_password=hashed_password, role_id=user.role_id)
+    new_user = models.User(username=user.username, email=user.email, hashed_password=hashed_password, role_id=user.role_id)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -275,8 +298,8 @@ async def predict_defect(
     current_user: models.User = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
-    if file.content_type not in ["image/jpeg", "image/png"]:
-        raise HTTPException(status_code=400, detail="Formato de archivo inválido. Solo JPG/PNG.")
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Formato de archivo inválido. Solo imágenes permitidas.")
     
     file_bytes = await file.read()
     
@@ -300,22 +323,25 @@ async def predict_defect(
                     # We need to map class_name to our db defect
                     defect_obj = db.query(models.DefectDictionary).filter(models.DefectDictionary.name == class_name).first()
                     if not defect_obj:
-                        # Fallback or create temporary if not exists
-                        defect_obj = db.query(models.DefectDictionary).first()
+                        # Auto-crear el defecto en el diccionario si la IA encuentra una clase nueva
+                        defect_obj = models.DefectDictionary(name=class_name, severity="Media", description="Defecto detectado por IA")
+                        db.add(defect_obj)
+                        db.commit()
+                        db.refresh(defect_obj)
                     
                     if defect_obj:
                         has_defects = True
                         detected_defects.append({
                             "obj": defect_obj,
                             "conf": conf,
-                            "bbox": box.xyxy[0].tolist()
+                            "bbox": box.xyxyn[0].tolist()
                         })
         except Exception as e:
             print(f"Error en YOLOv8, usando mock: {e}")
             has_defects = True
             defect_obj = db.query(models.DefectDictionary).first()
             if defect_obj:
-                detected_defects.append({"obj": defect_obj, "conf": 0.88, "bbox": [100.0, 120.0, 150.0, 160.0]})
+                detected_defects.append({"obj": defect_obj, "conf": 0.88, "bbox": [0.1, 0.2, 0.3, 0.4]})
     else:
         # MOCK LOGIC si no está best.pt
         defect_obj = db.query(models.DefectDictionary).filter(models.DefectDictionary.name == "Short Circuit").first()
@@ -324,7 +350,7 @@ async def predict_defect(
         
         has_defects = defect_obj is not None
         if has_defects:
-            detected_defects.append({"obj": defect_obj, "conf": 0.88, "bbox": [100.0, 120.0, 150.0, 160.0]})
+            detected_defects.append({"obj": defect_obj, "conf": 0.88, "bbox": [0.1, 0.2, 0.3, 0.4]})
             
     status_label = "Defectuoso" if has_defects else "OK"
     
@@ -386,14 +412,18 @@ async def predict_defect(
         smtp_port = db.query(models.SystemConfig).filter(models.SystemConfig.key == "email_port").first()
         smtp_user = db.query(models.SystemConfig).filter(models.SystemConfig.key == "email_user").first()
         smtp_pass = db.query(models.SystemConfig).filter(models.SystemConfig.key == "email_password").first()
-        email_to = db.query(models.SystemConfig).filter(models.SystemConfig.key == "email_recipient").first()
+        
+        # Obtener correos configurados (separados por coma)
+        email_to_cfg = db.query(models.SystemConfig).filter(models.SystemConfig.key == "email_recipient").first()
+        recipient_list = []
+        if email_to_cfg and email_to_cfg.value:
+            recipient_list.extend([e.strip() for e in email_to_cfg.value.split(',') if e.strip()])
 
-        if smtp_server and smtp_user and smtp_pass and email_to:
+        if smtp_server and smtp_user and smtp_pass and recipient_list:
             try:
-                msg = MIMEMultipart()
-                msg['From'] = smtp_user.value
-                msg['To'] = email_to.value
-                msg['Subject'] = f"⚠️ ALERTA V1si0n: Defecto detectado en placa {scan_log.id}"
+                server = smtplib.SMTP(smtp_server.value, int(smtp_port.value) if smtp_port else 587)
+                server.starttls()
+                server.login(smtp_user.value, smtp_pass.value)
                 
                 body = f"""
                 <h2>Alerta de Calidad V1si0n</h2>
@@ -402,15 +432,21 @@ async def predict_defect(
                 <p><strong>Resultado:</strong> Defectuoso</p>
                 <p>Por favor revise el panel de control para más detalles.</p>
                 """
-                msg.attach(MIMEText(body, 'html'))
                 
-                server = smtplib.SMTP(smtp_server.value, int(smtp_port.value) if smtp_port else 587)
-                server.starttls()
-                server.login(smtp_user.value, smtp_pass.value)
-                server.send_message(msg)
+                for recipient in recipient_list:
+                    try:
+                        msg = MIMEMultipart()
+                        msg['From'] = smtp_user.value
+                        msg['To'] = recipient
+                        msg['Subject'] = f"⚠️ ALERTA V1si0n: Defecto detectado en placa {scan_log.id}"
+                        msg.attach(MIMEText(body, 'html'))
+                        server.send_message(msg)
+                    except Exception as email_err:
+                        print(f"No se pudo enviar a {recipient}: {email_err}")
+                        
                 server.quit()
             except Exception as e:
-                print(f"Error enviando correo: {e}")
+                print(f"Error en servidor de correo: {e}")
 
     return {
         "status": "success",
@@ -466,9 +502,25 @@ def get_stats(db: Session = Depends(get_db), current_user: models.User = Depends
 
 
 # ================= OLLAMA CHATBOT =================
-@app.get("/chat/history", response_model=List[schemas.ChatHistory])
-def get_chat_history(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return db.query(models.ChatHistory).filter(models.ChatHistory.user_id == current_user.id).order_by(models.ChatHistory.timestamp.asc()).all()
+@app.get("/chat/sessions", response_model=List[schemas.ChatSession])
+def get_chat_sessions(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return db.query(models.ChatSession).filter(models.ChatSession.user_id == current_user.id).order_by(models.ChatSession.timestamp.desc()).all()
+
+@app.post("/chat/sessions", response_model=schemas.ChatSession)
+def create_chat_session(req: schemas.ChatSessionCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    new_session = models.ChatSession(user_id=current_user.id, title=req.title)
+    db.add(new_session)
+    db.commit()
+    db.refresh(new_session)
+    return new_session
+
+@app.get("/chat/sessions/{session_id}/history", response_model=List[schemas.ChatHistory])
+def get_session_history(session_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Verify ownership
+    session_obj = db.query(models.ChatSession).filter(models.ChatSession.id == session_id, models.ChatSession.user_id == current_user.id).first()
+    if not session_obj:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    return db.query(models.ChatHistory).filter(models.ChatHistory.session_id == session_id).order_by(models.ChatHistory.timestamp.asc()).all()
 
 @app.get("/prompts", response_model=List[schemas.PromptLibrary])
 def get_prompts(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -476,37 +528,70 @@ def get_prompts(db: Session = Depends(get_db), current_user: models.User = Depen
 
 @app.post("/chat", response_model=schemas.ChatResponse)
 async def chat_with_ollama(req: schemas.ChatRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    total_scans = db.query(models.ScanLog).count()
+    defect_scans = db.query(models.ScanLog).filter(models.ScanLog.status == "Defectuoso").count()
+    ok_scans = db.query(models.ScanLog).filter(models.ScanLog.status == "OK").count()
+    
     system_prompt = (
         "Eres V1si0n, un asistente de IA especializado estrictamente en control de calidad de placas "
         "de circuito impreso (PCBs). REGLA ESTRICTA: BAJO NINGUNA CIRCUNSTANCIA PUEDES HABLAR DE TEMAS "
         "FUERA DE PCBS, ELECTRÓNICA, YOLOV8, VISIÓN POR COMPUTADORA O CALIDAD INDUSTRIAL. Si el usuario "
-        "intenta cambiar de tema o preguntar sobre cosas generales (matemáticas, historia, chistes, programación general), "
-        "debes negarte rotundamente y responder: 'Mi contexto está estrictamente limitado al sistema V1si0n y PCBs. No puedo responder eso'."
+        "intenta cambiar de tema o preguntar sobre cosas generales, "
+        "debes negarte rotundamente y responder: 'Mi contexto está estrictamente limitado al sistema V1si0n y PCBs. No puedo responder eso'.\n\n"
+        "CONTEXTO DEL SISTEMA ACTUAL (puedes usar esto si el usuario pregunta):\n"
+        f"- Total de PCBs escaneadas históricamente: {total_scans}\n"
+        f"- PCBs Defectuosas encontradas: {defect_scans}\n"
+        f"- PCBs OK (Sin defectos): {ok_scans}\n"
+        "- Módulos del sistema: Escáner PCB, Bitácora de Inspecciones, Panel de Estadísticas y Chat de IA.\n"
+        "- Tu objetivo principal: Ayudar al operario a entender defectos como 'Corto Circuito', 'Exceso de Flux', 'Pines Unidos', dar recomendaciones, y responder dudas sobre las estadísticas actuales del sistema."
     )
     
-    # 1. Guardar mensaje de usuario
-    user_chat = models.ChatHistory(user_id=current_user.id, role="user", content=req.message)
-    db.add(user_chat)
-    db.commit()
+    # Manejar sesión
+    session_id = req.session_id
+    if not req.is_ephemeral and not session_id:
+        # Create a default session if none provided and not ephemeral
+        new_sess = models.ChatSession(user_id=current_user.id, title="Chat " + datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M"))
+        db.add(new_sess)
+        db.commit()
+        db.refresh(new_sess)
+        session_id = new_sess.id
+
+    if not req.is_ephemeral:
+        # 1. Guardar mensaje de usuario
+        user_chat = models.ChatHistory(session_id=session_id, user_id=current_user.id, role="user", content=req.message)
+        db.add(user_chat)
+        db.commit()
 
     try:
         # Fetch conversation history to keep context
-        history = db.query(models.ChatHistory).filter(models.ChatHistory.user_id == current_user.id).order_by(models.ChatHistory.timestamp.asc()).all()
+        history = []
+        if not req.is_ephemeral and session_id:
+            history = db.query(models.ChatHistory).filter(models.ChatHistory.session_id == session_id).order_by(models.ChatHistory.timestamp.asc()).all()
+            
         messages = [{'role': 'system', 'content': system_prompt}]
         for h in history[-10:]: # last 10 messages for context
             messages.append({'role': h.role, 'content': h.content})
             
-        # We append the current message because history includes it now
-        
+        if req.is_ephemeral:
+            # Add the current user message since it's not in the DB history
+            messages.append({'role': 'user', 'content': req.message})
+            
         response = ollama.chat(model='llama3.2', messages=messages)
         bot_response = response['message']['content']
         
-        # 2. Guardar respuesta del asistente
-        bot_chat = models.ChatHistory(user_id=current_user.id, role="assistant", content=bot_response)
-        db.add(bot_chat)
-        db.commit()
+        if not req.is_ephemeral:
+            # 2. Guardar respuesta del asistente
+            bot_chat = models.ChatHistory(session_id=session_id, user_id=current_user.id, role="assistant", content=bot_response)
+            db.add(bot_chat)
+            db.commit()
+            
+            # Update session timestamp
+            sess = db.query(models.ChatSession).filter(models.ChatSession.id == session_id).first()
+            if sess:
+                sess.timestamp = datetime.datetime.utcnow()
+                db.commit()
         
-        return {"response": bot_response}
+        return {"response": bot_response, "session_id": session_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ollama local no disponible: {str(e)}")
 

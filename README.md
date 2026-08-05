@@ -8,13 +8,182 @@ V1si0n es un sistema moderno, responsivo y ultraseguro diseñado para la detecci
 - **Configuraciones Avanzadas y Seguridad:** Panel de ajustes para parámetros críticos y módulo de usuarios (CRUD) con validación obligatoria de contraseña de administrador para cada cambio.
 - **Dashboard Estadístico Responsivo:** Gráficas interactivas y dinámicas (basadas en Recharts) que muestran la tasa de éxito y tipos de defectos.
 - **Bitácora de Inspecciones con Exportación:** Registro detallado con capacidad de descargar reportes en PDF y Excel, ahora totalmente adaptado y responsivo.
+- **Inspección en Vivo (WebSockets):** Soporte para escaneo de PCBs en tiempo real (10 FPS) utilizando cámaras locales o móviles, procesando frames con YOLOv8 y renderizando cajas de defectos (bounding boxes) dinámicas sobre el video.
+- **Despliegue en Red Local (LAN):** Resolución dinámica de endpoints para permitir el acceso al sistema desde cualquier dispositivo de la red WiFi utilizando la IP local de la computadora principal.
+
+## 📊 Diagramas del Sistema
+
+### 1. Diagrama de Casos de Uso
+```mermaid
+flowchart LR
+    A((Admin))
+    I((Inspector))
+
+    subgraph Sistema V1si0n
+        UC1([Login / Autenticación])
+        UC2([Gestión de Usuarios - CRUD])
+        UC3([Configuraciones del Sistema])
+        UC4([Escaneo de PCB estático - Foto])
+        UC5([Escaneo de PCB en Vivo - WebSockets])
+        UC6([Visualizar Dashboard Estadístico])
+        UC7([Ver y Exportar Bitácora a PDF/Excel])
+        UC8([Chatear con Asistente IA - Llama/Whisper])
+    end
+
+    A --> UC1
+    A --> UC2
+    A --> UC3
+    A --> UC4
+    A --> UC5
+    A --> UC6
+    A --> UC7
+    A --> UC8
+
+    I --> UC1
+    I --> UC4
+    I --> UC5
+    I --> UC6
+    I --> UC7
+    I --> UC8
+```
+
+### 2. Diagrama Entidad-Relación (Base de Datos PostgreSQL)
+```mermaid
+erDiagram
+    Role ||--o{ User : "tiene"
+    User ||--o{ ScanLog : "realiza"
+    User ||--o{ ChatSession : "crea"
+    ChatSession ||--o{ ChatHistory : "contiene"
+    ProductionLine ||--o{ ScanLog : "monitorea"
+    PcbModel ||--o{ ScanLog : "escaneado_en"
+    ScanLog ||--o{ ScanDefect : "encuentra"
+    DefectDictionary ||--o{ ScanDefect : "categoriza"
+    
+    Role {
+        int id PK
+        string name
+        string description
+    }
+    User {
+        int id PK
+        string username
+        string email
+        string hashed_password
+        boolean is_active
+        string dashboard_config
+        int role_id FK
+    }
+    ProductionLine {
+        int id PK
+        string name
+        string location
+    }
+    PcbModel {
+        int id PK
+        string name
+        string description
+    }
+    DefectDictionary {
+        int id PK
+        string name
+        string severity
+        string description
+    }
+    ScanLog {
+        int id PK
+        string filename
+        string status
+        datetime timestamp
+        int user_id FK
+        int production_line_id FK
+        int pcb_model_id FK
+    }
+    ScanDefect {
+        int id PK
+        float confidence
+        float bbox_x1
+        float bbox_y1
+        float bbox_x2
+        float bbox_y2
+        int scan_id FK
+        int defect_id FK
+    }
+    ChatSession {
+        int id PK
+        string title
+        datetime timestamp
+        int user_id FK
+    }
+    ChatHistory {
+        int id PK
+        string role
+        text content
+        datetime timestamp
+        int session_id FK
+        int user_id FK
+    }
+    Notification {
+        int id PK
+        string type
+        text message
+        boolean is_read
+        datetime timestamp
+    }
+    SystemConfig {
+        int id PK
+        string key
+        string value
+    }
+```
 
 ## 🏗️ Arquitectura del Proyecto
 
-El proyecto está dividido en tres componentes principales para asegurar escalabilidad y mantenibilidad:
+El proyecto está dividido en tres componentes principales para asegurar escalabilidad, mantenibilidad y rendimiento en tiempo real:
+
+```mermaid
+flowchart TD
+    subgraph Frontend - React & Vite
+        UI[Interfaz de Usuario]
+        WS_Client[WebSocket Client]
+        HTTP_Client[HTTP Fetch API]
+    end
+
+    subgraph Backend - FastAPI
+        API[Rutas REST API]
+        WS_Server[WebSocket Server]
+        Auth[Autenticación JWT]
+        AI[Módulo IA Central]
+    end
+
+    subgraph Base de Datos
+        DB[(PostgreSQL)]
+    end
+
+    subgraph AI Local
+        YOLO[Modelos YOLOv8 .pt]
+        Llama[Ollama Llama 3.2]
+        Whisper[Faster Whisper]
+    end
+
+    UI --> HTTP_Client
+    UI --> WS_Client
+
+    HTTP_Client -- Peticiones HTTP/REST --> API
+    WS_Client -- Transmisión en Vivo --> WS_Server
+
+    API --> Auth
+    API --> DB
+    WS_Server --> AI
+
+    API --> AI
+    
+    AI --> YOLO
+    AI --> Llama
+    AI --> Whisper
+```
 
 - **/frontend**: Interfaz web interactiva construida con **React** y **Vite**. Diseñada con un enfoque estético premium (Glassmorphism, Dark Mode). Conectada directamente a la API backend.
-- **/backend**: API robusta desarrollada con **FastAPI** y **PostgreSQL**. Se encarga de la seguridad, Rate Limiting, manejo de sesiones (JWT), gestión de usuarios, almacenamiento de bitácoras e inferencia del modelo.
+- **/backend**: API robusta desarrollada con **FastAPI** y **PostgreSQL**. Se encarga de la seguridad, Rate Limiting, manejo de sesiones (JWT), gestión de usuarios, almacenamiento de bitácoras, túneles WebSocket e inferencia del modelo.
 - **/ai**: Scripts y utilidades para el entrenamiento local de la Inteligencia Artificial (**YOLOv8**) aprovechando la potencia de tu máquina.
 
 ---

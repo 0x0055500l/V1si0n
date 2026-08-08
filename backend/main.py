@@ -540,6 +540,10 @@ async def chat_with_ollama(req: schemas.ChatRequest, current_user: models.User =
         "FUERA DE PCBS, ELECTRÓNICA, YOLOV8, VISIÓN POR COMPUTADORA O CALIDAD INDUSTRIAL. Si el usuario "
         "intenta cambiar de tema o preguntar sobre cosas generales, "
         "debes negarte rotundamente y responder: 'Mi contexto está estrictamente limitado al sistema V1si0n y PCBs. No puedo responder eso'.\n\n"
+        "INSTRUCCIÓN ESPECIAL: Al final de tu respuesta, SIEMPRE debes sugerir 3 preguntas cortas de seguimiento "
+        "relevantes a la conversación actual. Tu respuesta DEBE terminar estrictamente con este formato: \n"
+        "__SUGGESTIONS__\npregunta 1|pregunta 2|pregunta 3\n"
+        "(No uses viñetas ni números en las sugerencias, sepáralas únicamente por el símbolo '|').\n\n"
         "CONTEXTO DEL SISTEMA ACTUAL (puedes usar esto si el usuario pregunta):\n"
         f"- Total de PCBs escaneadas históricamente: {total_scans}\n"
         f"- PCBs Defectuosas encontradas: {defect_scans}\n"
@@ -558,9 +562,36 @@ async def chat_with_ollama(req: schemas.ChatRequest, current_user: models.User =
         db.refresh(new_sess)
         session_id = new_sess.id
 
+    user_prompt_content = req.message
+    
+    if req.image_base64:
+        try:
+            image_data = base64.b64decode(req.image_base64.split(",")[1] if "," in req.image_base64 else req.image_base64)
+            img = Image.open(io.BytesIO(image_data))
+            if YOLO_AVAILABLE and os.path.exists("best.pt"):
+                model = YOLO("best.pt")
+                results = model(img)
+                defects = []
+                if len(results) > 0:
+                    for box in results[0].boxes:
+                        cls_id = int(box.cls[0])
+                        conf = float(box.conf[0])
+                        defects.append(f"{model.names[cls_id]} ({int(conf*100)}%)")
+                
+                if defects:
+                    vision_ctx = f"El escáner YOLOv8 analizó la imagen y encontró los siguientes defectos: {', '.join(defects)}."
+                    user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: {vision_ctx} Por favor, responde a la pregunta del usuario considerando estos defectos y ayúdalo a entender qué significan o cómo solucionarlos.]\n\nPregunta del usuario: {req.message}"
+                else:
+                    vision_ctx = "El escáner YOLOv8 no detectó ningún defecto evidente en la imagen."
+                    user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: {vision_ctx} Si el usuario pregunta por defectos, dile que la placa parece estar OK. Si la imagen obviamente no parece un PCB, puedes sugerirle suavemente que solo estás entrenado para ver PCBs.]\n\nPregunta del usuario: {req.message}"
+            else:
+                user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: El usuario adjuntó una imagen, pero el motor YOLOv8 no está disponible en el servidor.]\n\nPregunta del usuario: {req.message}"
+        except Exception as e:
+            user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: Error procesando la imagen adjunta: {e}]\n\nPregunta del usuario: {req.message}"
+
     if not req.is_ephemeral:
         # 1. Guardar mensaje de usuario
-        user_chat = models.ChatHistory(session_id=session_id, user_id=current_user.id, role="user", content=req.message)
+        user_chat = models.ChatHistory(session_id=session_id, user_id=current_user.id, role="user", content=req.message) # Guardamos el mensaje original en DB, no el prompt inyectado
         db.add(user_chat)
         db.commit()
 
@@ -571,12 +602,12 @@ async def chat_with_ollama(req: schemas.ChatRequest, current_user: models.User =
             history = db.query(models.ChatHistory).filter(models.ChatHistory.session_id == session_id).order_by(models.ChatHistory.timestamp.asc()).all()
             
         messages = [{'role': 'system', 'content': system_prompt}]
-        for h in history[-10:]: # last 10 messages for context
+        # Omitimos el último mensaje del historial si es el que acabamos de guardar, porque lo mandaremos modificado
+        for h in history[:-1] if (not req.is_ephemeral and history) else history:
             messages.append({'role': h.role, 'content': h.content})
             
-        if req.is_ephemeral:
-            # Add the current user message since it's not in the DB history
-            messages.append({'role': 'user', 'content': req.message})
+        # Agregamos el mensaje modificado
+        messages.append({'role': 'user', 'content': user_prompt_content})
             
         response = ollama.chat(model='llama3.2', messages=messages)
         bot_response = response['message']['content']

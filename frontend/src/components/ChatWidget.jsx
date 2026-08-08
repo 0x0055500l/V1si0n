@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Send, Bot, MessageSquare, Mic, Plus, ShieldAlert, History } from 'lucide-react';
+import { Send, Bot, MessageSquare, Mic, Plus, ShieldAlert, History, Paperclip, X } from 'lucide-react';
 import PasswordModal from './PasswordModal';
 import { useLang, t } from '../i18n';
+import ReactMarkdown from 'react-markdown';
 
 export default function ChatWidget() {
   const lang = useLang();
@@ -10,12 +11,17 @@ export default function ChatWidget() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [prompts, setPrompts] = useState([]);
+  const [dynamicSuggestions, setDynamicSuggestions] = useState([]);
   
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isEphemeral, setIsEphemeral] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -47,11 +53,25 @@ export default function ChatWidget() {
   const loadHistory = async (sessionId) => {
     setIsEphemeral(false);
     setActiveSessionId(sessionId);
+    setDynamicSuggestions([]); // Clear dynamic suggestions on load
     const token = localStorage.getItem('access_token');
     try {
       const res = await fetch(`http://${window.location.hostname}:8000/chat/sessions/${sessionId}/history`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) {
-        const history = await res.json();
+        let history = await res.json();
+        
+        // Extract suggestions if they exist in the last message
+        if (history.length > 0 && history[history.length - 1].role === 'assistant') {
+          const lastMsg = history[history.length - 1].content;
+          if (lastMsg.includes('__SUGGESTIONS__')) {
+            const [cleanMsg, suggStr] = lastMsg.split('__SUGGESTIONS__');
+            history[history.length - 1].content = cleanMsg.trim();
+            if (suggStr) {
+              setDynamicSuggestions(suggStr.trim().split('|').filter(s => s.trim() !== ''));
+            }
+          }
+        }
+        
         setMessages(history.length ? history : [{ role: 'assistant', content: 'Chat restaurado.' }]);
       }
     } catch (err) { console.error(err); }
@@ -71,20 +91,18 @@ export default function ChatWidget() {
 
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, dynamicSuggestions]);
 
-  // Cleanup ephemeral chat on unmount
   useEffect(() => {
     return () => {
-      if (isEphemeral) {
-        setMessages([]); // Wiped without a trace
-      }
+      if (isEphemeral) setMessages([]);
     };
   }, [isEphemeral]);
 
   const handleNewChat = () => {
     setIsEphemeral(false);
     setActiveSessionId(null);
+    setDynamicSuggestions([]);
     setMessages([{ role: 'assistant', content: 'Nuevo chat iniciado. ¿En qué puedo ayudarte?' }]);
   };
 
@@ -95,34 +113,81 @@ export default function ChatWidget() {
   const onSecretChatVerified = () => {
     setIsEphemeral(true);
     setActiveSessionId(null);
+    setDynamicSuggestions([]);
     setMessages([{ role: 'assistant', content: 'Modo Autodestruible Activado. Este chat no dejará rastros en el servidor y se eliminará al salir de esta ventana.' }]);
+  };
+  
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSend = async (messageText) => {
     const textToSend = typeof messageText === 'string' ? messageText : input;
-    if (!textToSend.trim() || loading) return;
+    if (!textToSend.trim() && !imagePreview || loading) return;
 
-    setMessages(prev => [...prev, { role: 'user', content: textToSend }]);
+    let base64Image = null;
+    if (imagePreview) {
+      base64Image = imagePreview;
+      setMessages(prev => [...prev, { role: 'user', content: textToSend, image: imagePreview }]);
+    } else {
+      setMessages(prev => [...prev, { role: 'user', content: textToSend }]);
+    }
+    
     setInput('');
+    removeImage();
+    setDynamicSuggestions([]);
     setLoading(true);
 
     try {
       const token = localStorage.getItem('access_token');
+      const payload = { 
+        message: textToSend || 'Analiza esta imagen por favor.', 
+        session_id: activeSessionId, 
+        is_ephemeral: isEphemeral 
+      };
+      if (base64Image) payload.image_base64 = base64Image;
+
       const res = await fetch(`http://${window.location.hostname}:8000/chat`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ message: textToSend, session_id: activeSessionId, is_ephemeral: isEphemeral })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
         const data = await res.json();
-        setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+        let finalResponse = data.response;
+        let newSuggestions = [];
+
+        // Parse suggestions from backend
+        if (finalResponse.includes('__SUGGESTIONS__')) {
+          const parts = finalResponse.split('__SUGGESTIONS__');
+          finalResponse = parts[0].trim();
+          if (parts[1]) {
+            newSuggestions = parts[1].trim().split('|').filter(s => s.trim() !== '');
+          }
+        }
+
+        setMessages(prev => [...prev, { role: 'assistant', content: finalResponse }]);
+        setDynamicSuggestions(newSuggestions);
+        
         if (data.session_id && data.session_id !== activeSessionId && !isEphemeral) {
           setActiveSessionId(data.session_id);
-          loadSessions(); // reload sidebar
+          loadSessions(); 
         }
       } else {
         setMessages(prev => [...prev, { role: 'assistant', content: 'Error en conexión con la IA.' }]);
@@ -186,6 +251,11 @@ export default function ChatWidget() {
       setIsRecording(false);
     }
   };
+
+  // Decide which prompts to show in the sidebar
+  const displayedPrompts = dynamicSuggestions.length > 0 
+    ? dynamicSuggestions.map((sugg, i) => ({ id: `dyn-${i}`, title: 'Pregunta sugerida', content: sugg }))
+    : prompts;
 
   return (
     <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '250px 1fr 300px', gap: '2rem', height: 'calc(100vh - 4rem)' }}>
@@ -254,7 +324,18 @@ export default function ChatWidget() {
               borderBottomLeftRadius: m.role === 'assistant' ? '0' : '12px',
               border: m.role === 'assistant' ? '1px solid var(--surface-border)' : 'none'
             }}>
-              {m.content}
+              {m.image && (
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <img src={m.image} alt="Adjunto" style={{ maxWidth: '200px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)' }} />
+                </div>
+              )}
+              {m.role === 'assistant' ? (
+                <div className="markdown-content">
+                  <ReactMarkdown>{m.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+              )}
             </div>
           ))}
           {loading && (
@@ -268,47 +349,83 @@ export default function ChatWidget() {
           <div ref={endOfMessagesRef} />
         </div>
 
-        <form onSubmit={(e) => { e.preventDefault(); handleSend(input); }} style={{ padding: '1.5rem', borderTop: '1px solid var(--surface-border)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <button 
-            type="button" 
-            onMouseDown={startRecording}
-            onMouseUp={stopRecording}
-            onMouseLeave={stopRecording}
-            onTouchStart={startRecording}
-            onTouchEnd={stopRecording}
-            className={`btn ${isRecording ? 'btn-danger' : 'btn-secondary'}`} 
-            style={{ padding: '1rem', borderRadius: '50%', animation: isRecording ? 'pulse-record 1.5s infinite' : 'none' }}
-            title="Mantén presionado para hablar"
-          >
-            <Mic size={20} color={isRecording ? 'white' : 'var(--text-muted)'} />
-          </button>
-          <input 
-            type="text" 
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder={isEphemeral ? t(lang, 'secret_message') : t(lang, 'type_message')}
-            style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--surface-border)', padding: '1rem', borderRadius: '8px', color: 'white' }}
-          />
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            disabled={loading} 
-            style={{ padding: '1rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isEphemeral ? 'var(--danger)' : 'var(--primary)' }}
-          >
-            <Send size={20} />
-          </button>
-        </form>
+        {/* Input Area */}
+        <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column' }}>
+          
+          {/* Image Preview */}
+          {imagePreview && (
+            <div style={{ position: 'relative', display: 'inline-block', marginBottom: '1rem', alignSelf: 'flex-start' }}>
+              <img src={imagePreview} alt="Preview" style={{ height: '80px', borderRadius: '8px', border: '2px solid var(--primary)' }} />
+              <button 
+                onClick={removeImage}
+                style={{ position: 'absolute', top: '-8px', right: '-8px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={(e) => { e.preventDefault(); handleSend(input); }} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            
+            <input 
+              type="file" 
+              accept="image/*" 
+              ref={fileInputRef} 
+              style={{ display: 'none' }} 
+              onChange={handleImageChange}
+            />
+            
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="btn btn-secondary"
+              style={{ padding: '1rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}
+              title="Adjuntar imagen de PCB"
+            >
+              <Paperclip size={20} />
+            </button>
+
+            <button 
+              type="button" 
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onMouseLeave={stopRecording}
+              onTouchStart={startRecording}
+              onTouchEnd={stopRecording}
+              className={`btn ${isRecording ? 'btn-danger' : 'btn-secondary'}`} 
+              style={{ padding: '1rem', borderRadius: '50%', animation: isRecording ? 'pulse-record 1.5s infinite' : 'none' }}
+              title="Mantén presionado para hablar"
+            >
+              <Mic size={20} color={isRecording ? 'white' : 'var(--text-muted)'} />
+            </button>
+            <input 
+              type="text" 
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              placeholder={isEphemeral ? t(lang, 'secret_message') : (imagePreview ? "Escribe un mensaje sobre la imagen..." : t(lang, 'type_message'))}
+              style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--surface-border)', padding: '1rem', borderRadius: '8px', color: 'white' }}
+            />
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              disabled={loading || (!input.trim() && !imagePreview)} 
+              style={{ padding: '1rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isEphemeral ? 'var(--danger)' : 'var(--primary)' }}
+            >
+              <Send size={20} />
+            </button>
+          </form>
+        </div>
       </div>
 
       {/* Prompts Library Area */}
       <div className="glass-panel" style={{ padding: '1.5rem', overflowY: 'auto' }}>
-        <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: dynamicSuggestions.length > 0 ? '#10b981' : 'white' }}>
           <MessageSquare size={18} />
-          {t(lang, 'prompts')}
+          {dynamicSuggestions.length > 0 ? 'Sugerencias Dinámicas' : t(lang, 'prompts')}
         </h3>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {prompts.map(p => (
+          {displayedPrompts.map(p => (
             <div 
               key={p.id}
               onClick={() => handleSend(p.content)}
@@ -316,18 +433,18 @@ export default function ChatWidget() {
                 background: 'rgba(255,255,255,0.05)',
                 padding: '1rem',
                 borderRadius: '8px',
-                border: '1px solid var(--surface-border)',
+                border: dynamicSuggestions.length > 0 ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--surface-border)',
                 cursor: 'pointer',
                 transition: 'all 0.2s'
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)'}
+              onMouseEnter={e => e.currentTarget.style.background = dynamicSuggestions.length > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(99, 102, 241, 0.1)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
             >
-              <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)', fontSize: '0.95rem' }}>{p.title}</h4>
+              <h4 style={{ margin: '0 0 0.5rem 0', color: dynamicSuggestions.length > 0 ? '#10b981' : 'var(--primary)', fontSize: '0.95rem' }}>{p.title}</h4>
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{p.content}</p>
             </div>
           ))}
-          {prompts.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Cargando prompts...</p>}
+          {displayedPrompts.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No hay sugerencias disponibles...</p>}
         </div>
       </div>
 

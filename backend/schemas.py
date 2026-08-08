@@ -132,6 +132,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[int] = None
     is_ephemeral: bool = False
+    image_base64: Optional[str] = None
 
 class PasswordVerifyRequest(BaseModel):
     password: str

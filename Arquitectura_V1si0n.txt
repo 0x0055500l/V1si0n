@@ -1,0 +1,117 @@
+========================================================
+    ARQUITECTURA DEL SISTEMA V1SI0N - CONTROL DE CALIDAD
+========================================================
+
+El sistema V1si0n es una plataforma escalable dividida en 3 capas principales (Frontend, Backend y Modelos de Inteligencia Artificial).
+
+========================================================
+1. ESTRUCTURA DE DIRECTORIOS (Resumida)
+========================================================
+
+V1si0n/
+├── ai/                      (Carpeta de entrenamiento IA)
+│   ├── dataset/             (Imágenes de PCBs)
+│   ├── train_yolov8.py      (Script de entrenamiento local)
+│   └── yolov8n.pt           (Modelo base YOLO)
+│
+├── backend/                 (API REST & WebSockets)
+│   ├── main.py              (Punto de entrada FastAPI, Endpoints REST y WebSockets)
+│   ├── database.py          (Conexión a PostgreSQL con SQLAlchemy)
+│   ├── models.py            (Modelos ORM de base de datos)
+│   ├── schemas.py           (Validadores Pydantic para Entradas/Salidas)
+│   ├── auth.py              (Lógica de JWT, Hashing de contraseñas bcrypt)
+│   ├── create_db.py         (Script de inicialización y siembra/seeding)
+│   ├── best.pt              (Modelo YOLOv8 pre-entrenado listo para inferencia)
+│   ├── requirements.txt     (Dependencias: fastapi, psycopg2, ultralytics, etc)
+│   └── Dockerfile           (Contenedor para la API)
+│
+├── frontend/                (Aplicación Web React)
+│   ├── src/
+│   │   ├── components/      (Componentes UI reutilizables como Sidebar, ChatWidget)
+│   │   ├── views/           (Vistas principales: Login, Scanner, History, Settings)
+│   │   ├── i18n.js          (Diccionario de traducciones: Inglés/Español)
+│   │   ├── App.jsx          (Enrutamiento principal)
+│   │   ├── index.css        (Estilos globales, variables CSS, utilidades)
+│   │   └── main.jsx         (Punto de entrada de React)
+│   ├── package.json         (Dependencias: react, lucide-react, recharts)
+│   ├── vite.config.js       (Configuración de compilador Vite)
+│   └── Dockerfile           (Contenedor Nginx para frontend compilado)
+│
+├── docker-compose.yml       (Orquestador de contenedores DB, Backend y Frontend)
+└── README.md                (Documentación oficial del proyecto)
+
+========================================================
+2. STACK TECNOLÓGICO
+========================================================
+
+FRONTEND:
+- React.js (Vite)
+- CSS Vanilla (Enfoque Glassmorphism y Dark Mode)
+- Lucide React (Íconos SVG ligeros)
+- Recharts (Gráficas interactivas para dashboard estadístico)
+- Fetch API & WebSockets nativos (Para peticiones dinámicas HTTP y túneles persistentes).
+
+BACKEND:
+- Python 3.9+
+- FastAPI (Framework Asíncrono hiper-rápido para APIs RESTful).
+- WebSockets (Comunicación full-duplex para escaneo en tiempo real).
+- SQLAlchemy (ORM para mapear objetos de Python a la BD).
+- PostgreSQL (Base de datos relacional de nivel empresarial).
+- Uvicorn (Servidor ASGI de alto rendimiento).
+- Passlib + Bcrypt (Algoritmos de hashing seguro de contraseñas).
+- PyJWT (Creación y validación de tokens de acceso).
+- SlowAPI (Rate Limiting para evitar ataques de fuerza bruta).
+
+INTELIGENCIA ARTIFICIAL (Modelos Locales):
+- YOLOv8 de Ultralytics (Detección de objetos y defectos en PCBs en milisegundos).
+- Ollama Llama 3.2 (LLM Local para asistente y chatbot industrial).
+- Faster Whisper (Transcripción de voz a texto offline "Speech-to-Text").
+
+========================================================
+3. ARQUITECTURA DE FLUJO DE DATOS
+========================================================
+
+A) Flujo de Escaneo Estático (Imágenes o Cámara individual):
+   React envía la imagen (multipart/form-data) vía HTTP POST a -> /predict (FastAPI).
+   FastAPI -> Invoca modelo YOLOv8 -> Retorna coordenadas de defectos.
+   FastAPI -> Guarda ScanLog y ScanDefect en PostgreSQL.
+   FastAPI -> React dibuja bounding boxes y muestra veredicto.
+
+B) Flujo de Escaneo en Vivo (Live Mode):
+   React (Video stream) captura frame cada 100ms -> Base64 JPEG.
+   React abre túnel WebSocket -> ws://host:8000/ws/live-scan.
+   FastAPI recibe frames -> YOLOv8 procesa en RAM (sin guardar a Disco/BD).
+   FastAPI envía JSON con coordenadas normalizadas.
+   React dibuja overlay rojo dinámico sin refrescar la página.
+
+C) Flujo de Chat IA Asistente (RAG simple):
+   Usuario envía pregunta en React -> HTTP POST /chat.
+   FastAPI busca historial en base de datos -> Construye el contexto.
+   FastAPI envía Prompt a Ollama (host.docker.internal:11434).
+   Ollama procesa con LLM -> FastAPI recibe respuesta y la formatea en Markdown.
+
+========================================================
+4. DIAGRAMA ENTIDAD-RELACIÓN (BASE DE DATOS)
+========================================================
+
+- Roles (admin, inspector)
+- Users (username, password encriptado, relación con Roles)
+- ProductionLines (Líneas de ensamble de fábrica)
+- PcbModels (Tipos de placas de circuito impreso)
+- DefectDictionary (Catálogo de posibles fallos: Mouse Bite, Missing Hole, etc.)
+- ScanLogs (Registro histórico de cada escaneo estático: estado OK o Defectuoso)
+- ScanDefects (Coordenadas y confianza de YOLO para cada defecto de un ScanLog)
+- ChatSessions (Sesiones individuales de Chat por usuario)
+- ChatHistories (Mensajes de 'user' o 'assistant' dentro de una sesión)
+- PromptsLibrary (Librería de atajos para el Chat)
+- SystemConfigs (Variables de entorno guardadas en tabla para fácil edición en GUI)
+- Notifications (Notificaciones generadas para usuarios)
+
+========================================================
+5. CAPAS DE SEGURIDAD DEL SISTEMA
+========================================================
+1. Middleware de Seguridad: Inyección estricta de X-Content-Type-Options y X-Frame-Options para prevenir ataques Sniffing y Clickjacking.
+2. Rate Limiter: Endpoint "/token" bloqueado a 5 peticiones por minuto.
+3. JWT Authentication: Control de identidad sin mantener estados de sesión en servidor. Tokens expiran tras 1 hora.
+4. RBAC (Roles): Endpoints críticos validan si el usuario que llama tiene el nombre de rol "admin".
+5. CORS: Permite integración asíncrona pero delimita accesos si se requiere.

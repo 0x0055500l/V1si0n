@@ -42,9 +42,13 @@ export default function ChatWidget() {
         const data = await res.json();
         setSessions(data);
         if (data.length > 0 && !activeSessionId && !isEphemeral) {
-          loadHistory(data[0].id);
+          if (location.state?.initialPrompt) {
+            setMessages([{ role: 'assistant', content: lang === 'en' ? 'Hello, I am V1si0n AI. How can I help you today?' : 'Hola, soy la IA de V1si0n. ¿En qué puedo ayudarte hoy?' }]);
+          } else {
+            loadHistory(data[0].id);
+          }
         } else if (data.length === 0 && !isEphemeral) {
-          setMessages([{ role: 'assistant', content: 'Hola, soy la IA de V1si0n. ¿En qué puedo ayudarte hoy?' }]);
+          setMessages([{ role: 'assistant', content: lang === 'en' ? 'Hello, I am V1si0n AI. How can I help you today?' : 'Hola, soy la IA de V1si0n. ¿En qué puedo ayudarte hoy?' }]);
         }
       }
     } catch (err) { console.error(err); }

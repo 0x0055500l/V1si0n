@@ -133,9 +133,22 @@ class ChatRequest(BaseModel):
     session_id: Optional[int] = None
     is_ephemeral: bool = False
     image_base64: Optional[str] = None
+    lang: str = "es"
 
 class PasswordVerifyRequest(BaseModel):
     password: str
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+class PasswordResetVerify(BaseModel):
+    email: str
+    code: str
+
+class PasswordResetConfirm(BaseModel):
+    email: str
+    code: str
+    new_password: str
 
 class ChatResponse(BaseModel):
     response: str

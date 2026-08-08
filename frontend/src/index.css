@@ -143,6 +143,11 @@ input, select, textarea {
   transition: all var(--transition-fast);
 }
 
+select option {
+  background: var(--bg-color);
+  color: var(--text-main);
+}
+
 input:focus {
   outline: none;
   border-color: var(--primary);
@@ -383,6 +388,18 @@ input:checked + .toggle-slider:before {
   }
 }
 
+
+/* Markdown Styles */
+.markdown-content { font-family: var(--font-body); line-height: 1.6; }
+.markdown-content p { margin-bottom: 1rem; }
+.markdown-content p:last-child { margin-bottom: 0; }
+.markdown-content strong { color: var(--primary); font-weight: 600; }
+.markdown-content ul, .markdown-content ol { margin-left: 1.5rem; margin-bottom: 1rem; }
+.markdown-content li { margin-bottom: 0.25rem; }
+.markdown-content code { background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+
+.chat-layout { display: grid; grid-template-columns: 250px 1fr 300px; }
+@media (max-width: 1024px) { .chat-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; overflow-y: auto; gap: 1rem; } .chat-layout > div { min-height: 300px; } }
 
 /* Markdown Styles */
 .markdown-content { font-family: var(--font-body); line-height: 1.6; }

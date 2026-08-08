@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Trash2 } from 'lucide-react';
+import { Search, Trash2, Shield, User, Mail, Lock } from 'lucide-react';
 import PasswordModal from '../components/PasswordModal';
 import { useLang, t } from '../i18n';
 
@@ -268,27 +268,39 @@ export default function UsersView() {
           <>
             <h3 style={{ marginBottom: '1rem' }}>{t(lang, 'new_user')}</h3>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <input 
-                type="text" 
-                placeholder={t(lang, 'username')} 
-                required 
-                value={newUsername} 
-                onChange={(e) => setNewUsername(e.target.value)} 
-              />
-              <input 
-                type="email" 
-                placeholder="Email" 
-                required 
-                value={newEmail} 
-                onChange={(e) => setNewEmail(e.target.value)} 
-              />
-              <input 
-                type="password" 
-                placeholder="Password" 
-                required 
-                value={newPassword} 
-                onChange={(e) => setNewPassword(e.target.value)} 
-              />
+              <div style={{ position: 'relative' }}>
+                <User size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input 
+                  type="text" 
+                  placeholder={t(lang, 'username')} 
+                  required 
+                  value={newUsername} 
+                  onChange={(e) => setNewUsername(e.target.value)} 
+                  style={{ paddingLeft: '35px', width: '100%' }}
+                />
+              </div>
+              <div style={{ position: 'relative' }}>
+                <Mail size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input 
+                  type="email" 
+                  placeholder="Email" 
+                  required 
+                  value={newEmail} 
+                  onChange={(e) => setNewEmail(e.target.value)} 
+                  style={{ paddingLeft: '35px', width: '100%' }}
+                />
+              </div>
+              <div style={{ position: 'relative' }}>
+                <Lock size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input 
+                  type="password" 
+                  placeholder="Password" 
+                  required 
+                  value={newPassword} 
+                  onChange={(e) => setNewPassword(e.target.value)} 
+                  style={{ paddingLeft: '35px', width: '100%' }}
+                />
+              </div>
               <select value={newRole} onChange={(e) => setNewRole(e.target.value)} style={{ padding: '0.75rem', background: 'var(--glass-bg)', color: 'var(--text-main)', border: '1px solid var(--surface-border)', borderRadius: '8px' }}>
                 <option value="inspector">Inspector</option>
                 <option value="admin">Administrador</option>

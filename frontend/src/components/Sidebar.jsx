@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Scan, History, Users, MessageSquare, LogOut, Settings, Bell, Moon, Sun, Globe } from 'lucide-react';
+import { Home, Scan, History, Users, MessageSquare, LogOut, Settings, Bell, Moon, Sun, Globe, Info } from 'lucide-react';
 import { t, useLang, changeLanguage } from '../i18n';
 
 export default function Sidebar({ user, role, onLogout }) {
@@ -45,6 +45,8 @@ export default function Sidebar({ user, role, onLogout }) {
     navItems.push({ path: '/users', icon: <Users size={20} />, label: t(lang, 'users') });
     navItems.push({ path: '/settings', icon: <Settings size={20} />, label: t(lang, 'settings') });
   }
+  
+  navItems.push({ path: '/about', icon: <Info size={20} />, label: lang === 'en' ? 'About' : 'Acerca De' });
 
   const fetchNotifications = async () => {
     try {
@@ -140,12 +142,19 @@ export default function Sidebar({ user, role, onLogout }) {
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t(lang, 'no_notifications')}</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {notifications.map(n => (
-                    <div key={n.id} onClick={() => handleRead(n.id)} style={{ padding: '0.75rem', borderRadius: '8px', background: n.is_read ? 'var(--surface-bg)' : 'rgba(239, 68, 68, 0.1)', border: '1px solid', borderColor: n.is_read ? 'var(--surface-border)' : 'var(--danger)', cursor: 'pointer', opacity: n.is_read ? 0.6 : 1 }}>
-                      <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.85rem', fontWeight: n.is_read ? 'normal' : 'bold', wordBreak: 'break-word' }}>{n.message}</p>
-                      <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{new Date(n.timestamp).toLocaleString()}</small>
-                    </div>
-                  ))}
+                  {notifications.map(n => {
+                    let displayMsg = n.message;
+                    if (lang === 'en' && displayMsg.startsWith('Defecto encontrado en placa')) {
+                      displayMsg = displayMsg.replace('Defecto encontrado en placa', 'Defect found on board')
+                                             .replace('Estado: Defectuoso', 'Status: Defective');
+                    }
+                    return (
+                      <div key={n.id} onClick={() => handleRead(n.id)} style={{ padding: '0.75rem', borderRadius: '8px', background: n.is_read ? 'var(--surface-bg)' : 'rgba(239, 68, 68, 0.1)', border: '1px solid', borderColor: n.is_read ? 'var(--surface-border)' : 'var(--danger)', cursor: 'pointer', opacity: n.is_read ? 0.6 : 1 }}>
+                        <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.85rem', fontWeight: n.is_read ? 'normal' : 'bold', wordBreak: 'break-word' }}>{displayMsg}</p>
+                        <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{new Date(n.timestamp).toLocaleString(lang === 'en' ? 'en-US' : 'es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</small>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

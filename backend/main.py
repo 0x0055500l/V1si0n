@@ -16,9 +16,10 @@ import os
 import requests
 import io
 import smtplib
+import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from PIL import Image
+from PIL import Image, ImageDraw
 import base64
 
 try:
@@ -84,13 +85,22 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     try:
         payload = auth.jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
         username: str = payload.get("sub")
-        if username is None:
+        session_id: str = payload.get("session_id")
+        if username is None or session_id is None:
             raise credentials_exception
     except auth.JWTError:
         raise credentials_exception
     user = db.query(models.User).filter(models.User.username == username).first()
     if user is None:
         raise credentials_exception
+    
+    if user.session_token != session_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesión expirada o iniciada en otro dispositivo",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
     return user
 
 async def get_current_admin(current_user: models.User = Depends(get_current_user)):
@@ -103,6 +113,12 @@ async def get_current_admin(current_user: models.User = Depends(get_current_user
 async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.username == form_data.username).first()
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
+        # Si la contraseña falla, revisar si tiene un reseteo pendiente
+        if user and user.reset_code and user.reset_expires and user.reset_expires > datetime.datetime.utcnow():
+            raise HTTPException(
+                status_code=403,
+                detail="PASSWORD_RESET_PENDING"
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -111,14 +127,19 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
 
+    import uuid
+    session_token = str(uuid.uuid4())
+    user.session_token = session_token
+    db.commit()
+
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": user.username, "role": user.role.name}, expires_delta=access_token_expires
+        data={"sub": user.username, "role": user.role.name, "session_id": session_token}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/users/me", response_model=schemas.User)
-async def read_users_me(current_user: models.User = Depends(get_current_user)):
+def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
 @app.post("/verify-password")
@@ -126,6 +147,84 @@ def verify_password_endpoint(req: schemas.PasswordVerifyRequest, db: Session = D
     if not auth.verify_password(req.password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Contraseña incorrecta")
     return {"status": "ok"}
+
+# ================= PASSWORD RECOVERY =================
+import random
+import string
+
+def is_strong_password(password: str) -> bool:
+    if len(password) < 8:
+        return False
+    if not re.search(r"[a-z]", password):
+        return False
+    if not re.search(r"[A-Z]", password):
+        return False
+    if not re.search(r"[0-9]", password):
+        return False
+    return True
+
+@app.post("/request-reset")
+def request_password_reset(req: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == req.email).first()
+    if not user:
+        return {"status": "ok"} # No revelar si el correo existe
+    
+    # Generar código de 6 dígitos
+    code = ''.join(random.choices(string.digits, k=6))
+    user.reset_code = code
+    user.reset_expires = datetime.datetime.utcnow() + timedelta(minutes=15)
+    db.commit()
+    
+    # Enviar correo
+    smtp_host = db.query(models.SystemConfig).filter_by(key="email_smtp_server").first()
+    smtp_user = db.query(models.SystemConfig).filter_by(key="email_user").first()
+    smtp_pass = db.query(models.SystemConfig).filter_by(key="email_password").first()
+    smtp_port = db.query(models.SystemConfig).filter_by(key="email_port").first()
+    
+    if smtp_host and smtp_host.value and smtp_user and smtp_user.value and smtp_pass and smtp_pass.value:
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = smtp_user.value
+            msg['To'] = user.email
+            msg['Subject'] = "Recuperación de Contraseña - V1si0n"
+            body = f"Tu código de recuperación es: {code}. Tienes 15 minutos para usarlo."
+            msg.attach(MIMEText(body, 'plain'))
+            
+            port = int(smtp_port.value) if smtp_port and smtp_port.value else 587
+            server = smtplib.SMTP(smtp_host.value, port)
+            server.starttls()
+            server.login(smtp_user.value, smtp_pass.value)
+            server.send_message(msg)
+            server.quit()
+        except Exception as e:
+            print("Error enviando correo de reseteo:", e)
+    else:
+        print(f"DEV MODE: Código de reseteo para {user.email}: {code}")
+        
+    return {"status": "ok", "message": "Código enviado si el correo existe"}
+
+@app.post("/verify-reset")
+def verify_reset_code(req: schemas.PasswordResetVerify, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == req.email).first()
+    if not user or user.reset_code != req.code or not user.reset_expires or user.reset_expires < datetime.datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Código inválido o expirado")
+    return {"status": "ok"}
+
+@app.post("/reset-password")
+def reset_password(req: schemas.PasswordResetConfirm, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == req.email).first()
+    if not user or user.reset_code != req.code or not user.reset_expires or user.reset_expires < datetime.datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Código inválido o expirado")
+        
+    if not is_strong_password(req.new_password):
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número.")
+        
+    user.hashed_password = auth.get_password_hash(req.new_password)
+    user.reset_code = None
+    user.reset_expires = None
+    user.session_token = None # Invalidar sesiones activas
+    db.commit()
+    return {"status": "ok", "message": "Contraseña actualizada exitosamente"}
 
 # ================= USER CRUD =================
 @app.get("/users", response_model=List[schemas.User])
@@ -138,10 +237,14 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="El usuario ya existe")
     if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
+        
+    if not is_strong_password(user.password):
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número.")
     
     hashed_password = auth.get_password_hash(user.password)
-    # Default to role_id=2 (inspector) if 1 is admin, or just use user.role_id
-    new_user = models.User(username=user.username, email=user.email, hashed_password=hashed_password, role_id=user.role_id)
+    # Default to role_id=2 (inspector) if not provided differently
+    role_to_assign = 2
+    new_user = models.User(username=user.username, email=user.email, hashed_password=hashed_password, role_id=role_to_assign)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -153,6 +256,9 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), admin: 
         raise HTTPException(status_code=400, detail="El usuario ya existe")
     if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
+        
+    if not is_strong_password(user.password):
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número.")
     
     hashed_password = auth.get_password_hash(user.password)
     new_user = models.User(username=user.username, email=user.email, hashed_password=hashed_password, role_id=user.role_id)
@@ -395,19 +501,52 @@ async def predict_defect(
         db.add(notif)
         db.commit()
         
+        # Obtener lista detallada de defectos para el reporte
+        defects_list_text = "\n".join([f"- {d['obj'].name} (Confianza: {int(d['conf']*100)}%)" for d in detected_defects])
+        defects_list_html = "".join([f"<li>{d['obj'].name} (Confianza: {int(d['conf']*100)}%)</li>" for d in detected_defects])
+
+        # Dibujar Cajas (Bounding Boxes) sobre la imagen
+        try:
+            alert_img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+            draw = ImageDraw.Draw(alert_img)
+            width, height = alert_img.size
+            for d in detected_defects:
+                bx1, by1, bx2, by2 = d["bbox"]
+                # Las coordenadas vienen normalizadas de YOLO (0 a 1) o de nuestro mock
+                # Por seguridad, si son < 1 asumimos que están normalizadas
+                if bx1 < 1 and by1 < 1 and bx2 <= 1 and by2 <= 1:
+                    x0 = bx1 * width
+                    y0 = by1 * height
+                    x1 = bx2 * width
+                    y1 = by2 * height
+                else:
+                    x0, y0, x1, y1 = bx1, by1, bx2, by2
+                
+                # Dibujar un rectángulo rojo con borde 3
+                draw.rectangle([x0, y0, x1, y1], outline="red", width=3)
+                # Opcional: Dibujar el nombre del defecto
+                draw.text((x0, max(0, y0 - 15)), d['obj'].name, fill="red")
+            
+            buf = io.BytesIO()
+            alert_img.save(buf, format="JPEG")
+            alert_file_bytes = buf.getvalue()
+        except Exception as draw_err:
+            print("Error dibujando bboxes:", draw_err)
+            alert_file_bytes = file_bytes # Fallback a original
+
         # Enviar alerta Telegram
         bot_token_cfg = db.query(models.SystemConfig).filter(models.SystemConfig.key == "telegram_bot_token").first()
         chat_id_cfg = db.query(models.SystemConfig).filter(models.SystemConfig.key == "telegram_chat_id").first()
         if bot_token_cfg and chat_id_cfg and bot_token_cfg.value and chat_id_cfg.value:
-            tg_url = f"https://api.telegram.org/bot{bot_token_cfg.value}/sendMessage"
+            tg_url = f"https://api.telegram.org/bot{bot_token_cfg.value}/sendPhoto"
             tg_data = {
                 "chat_id": chat_id_cfg.value,
-                "text": f"⚠️ ALERTA V1si0n ⚠️\nInspector: {current_user.username}\nArchivo: {file.filename}\nResultado: Defectuoso\nAcción requerida."
+                "caption": f"⚠️ ALERTA V1si0n ⚠️\nInspector: {current_user.username}\nArchivo: {file.filename}\nResultado: Defectuoso\n\nDetalles:\n{defects_list_text}"
             }
             try:
-                requests.post(tg_url, json=tg_data, timeout=5)
-            except:
-                pass # Ignorar errores de red de telegram
+                requests.post(tg_url, data=tg_data, files={"photo": ("image.jpg", alert_file_bytes)}, timeout=10)
+            except Exception as e:
+                print(f"Error telegram: {e}")
         
         # Enviar alerta por Correo Electrónico
         smtp_server = db.query(models.SystemConfig).filter(models.SystemConfig.key == "email_smtp_server").first()
@@ -432,8 +571,15 @@ async def predict_defect(
                 <p><strong>Inspector:</strong> {current_user.username}</p>
                 <p><strong>Archivo:</strong> {file.filename}</p>
                 <p><strong>Resultado:</strong> Defectuoso</p>
+                <p><strong>Detalle de Defectos:</strong></p>
+                <ul>
+                    {defects_list_html}
+                </ul>
                 <p>Por favor revise el panel de control para más detalles.</p>
                 """
+                
+                from email.mime.image import MIMEImage
+                img_data = alert_file_bytes
                 
                 for recipient in recipient_list:
                     try:
@@ -442,6 +588,10 @@ async def predict_defect(
                         msg['To'] = recipient
                         msg['Subject'] = f"⚠️ ALERTA V1si0n: Defecto detectado en placa {scan_log.id}"
                         msg.attach(MIMEText(body, 'html'))
+                        
+                        image = MIMEImage(img_data, name=file.filename)
+                        msg.attach(image)
+                        
                         server.send_message(msg)
                     except Exception as email_err:
                         print(f"No se pudo enviar a {recipient}: {email_err}")
@@ -461,37 +611,46 @@ async def predict_defect(
 
 @app.get("/scans", response_model=List[schemas.ScanLog])
 def get_scans(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return db.query(models.ScanLog).order_by(models.ScanLog.timestamp.desc()).all()
+    query = db.query(models.ScanLog)
+    if current_user.role.name == "inspector":
+        query = query.filter(models.ScanLog.user_id == current_user.id)
+    return query.order_by(models.ScanLog.timestamp.desc()).all()
 
 @app.get("/stats")
 def get_stats(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    total_scans = db.query(models.ScanLog).count()
-    defective_scans = db.query(models.ScanLog).filter(models.ScanLog.status == "Defectuoso").count()
-    ok_scans = db.query(models.ScanLog).filter(models.ScanLog.status == "OK").count()
+    # Filtrar por usuario si es inspector
+    base_query = db.query(models.ScanLog)
+    if current_user.role.name == "inspector":
+        base_query = base_query.filter(models.ScanLog.user_id == current_user.id)
+
+    total_scans = base_query.count()
+    defective_scans = base_query.filter(models.ScanLog.status == "Defectuoso").count()
+    ok_scans = base_query.filter(models.ScanLog.status == "OK").count()
     
     # Distribución de defectos
-    defect_counts = db.query(models.DefectDictionary.name, func.count(models.ScanDefect.id)).join(
+    defect_counts_query = db.query(models.DefectDictionary.name, func.count(models.ScanDefect.id)).join(
         models.ScanDefect, models.ScanDefect.defect_id == models.DefectDictionary.id
-    ).group_by(models.DefectDictionary.name).all()
+    ).join(
+        models.ScanLog, models.ScanLog.id == models.ScanDefect.scan_id
+    )
+    if current_user.role.name == "inspector":
+        defect_counts_query = defect_counts_query.filter(models.ScanLog.user_id == current_user.id)
     
+    defect_counts = defect_counts_query.group_by(models.DefectDictionary.name).all()
     distribution = [{"name": name, "value": count} for name, count in defect_counts]
 
     # Desempeño por línea
-    line_stats = db.query(models.ProductionLine.name, models.ScanLog.status, func.count(models.ScanLog.id)).join(
-        models.ScanLog, models.ScanLog.production_line_id == models.ProductionLine.id
-    ).group_by(models.ProductionLine.name, models.ScanLog.status).all()
+    lines = db.query(models.ProductionLine).all()
+    lines_dict = {l.id: {"name": l.name, "ok": 0, "defectuoso": 0} for l in lines}
     
-    lines_dict = {}
-    for line_name, status, count in line_stats:
-        if line_name not in lines_dict:
-            lines_dict[line_name] = {"name": line_name, "ok": 0, "defectuoso": 0}
-        
-        if status == "OK":
-            lines_dict[line_name]["ok"] = count
-        else:
-            lines_dict[line_name]["defectuoso"] = count
-
-    recent = db.query(models.ScanLog).order_by(models.ScanLog.timestamp.desc()).limit(5).all()
+    for scan in base_query.all():
+        if scan.production_line_id in lines_dict:
+            if scan.status == "OK":
+                lines_dict[scan.production_line_id]["ok"] += 1
+            else:
+                lines_dict[scan.production_line_id]["defectuoso"] += 1
+                
+    recent = base_query.order_by(models.ScanLog.timestamp.desc()).limit(10).all()
     
     return {
         "total": total_scans, 
@@ -530,27 +689,54 @@ def get_prompts(db: Session = Depends(get_db), current_user: models.User = Depen
 
 @app.post("/chat", response_model=schemas.ChatResponse)
 async def chat_with_ollama(req: schemas.ChatRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    total_scans = db.query(models.ScanLog).count()
-    defect_scans = db.query(models.ScanLog).filter(models.ScanLog.status == "Defectuoso").count()
-    ok_scans = db.query(models.ScanLog).filter(models.ScanLog.status == "OK").count()
+    # Filtrar por usuario si es inspector
+    base_query = db.query(models.ScanLog)
+    if current_user.role.name == "inspector":
+        base_query = base_query.filter(models.ScanLog.user_id == current_user.id)
+        
+    total_scans = base_query.count()
+    defect_scans = base_query.filter(models.ScanLog.status == "Defectuoso").count()
+    ok_scans = base_query.filter(models.ScanLog.status == "OK").count()
     
-    system_prompt = (
-        "Eres V1si0n, un asistente de IA especializado estrictamente en control de calidad de placas "
-        "de circuito impreso (PCBs). REGLA ESTRICTA: BAJO NINGUNA CIRCUNSTANCIA PUEDES HABLAR DE TEMAS "
-        "FUERA DE PCBS, ELECTRÓNICA, YOLOV8, VISIÓN POR COMPUTADORA O CALIDAD INDUSTRIAL. Si el usuario "
-        "intenta cambiar de tema o preguntar sobre cosas generales, "
-        "debes negarte rotundamente y responder: 'Mi contexto está estrictamente limitado al sistema V1si0n y PCBs. No puedo responder eso'.\n\n"
-        "INSTRUCCIÓN ESPECIAL: Al final de tu respuesta, SIEMPRE debes sugerir 3 preguntas cortas de seguimiento "
-        "relevantes a la conversación actual. Tu respuesta DEBE terminar estrictamente con este formato: \n"
-        "__SUGGESTIONS__\npregunta 1|pregunta 2|pregunta 3\n"
-        "(No uses viñetas ni números en las sugerencias, sepáralas únicamente por el símbolo '|').\n\n"
-        "CONTEXTO DEL SISTEMA ACTUAL (puedes usar esto si el usuario pregunta):\n"
-        f"- Total de PCBs escaneadas históricamente: {total_scans}\n"
-        f"- PCBs Defectuosas encontradas: {defect_scans}\n"
-        f"- PCBs OK (Sin defectos): {ok_scans}\n"
-        "- Módulos del sistema: Escáner PCB, Bitácora de Inspecciones, Panel de Estadísticas y Chat de IA.\n"
-        "- Tu objetivo principal: Ayudar al operario a entender defectos como 'Corto Circuito', 'Exceso de Flux', 'Pines Unidos', dar recomendaciones, y responder dudas sobre las estadísticas actuales del sistema."
-    )
+    if req.lang == "en":
+        system_prompt = (
+            "You are V1si0n, an AI assistant strictly specialized in quality control of Printed "
+            "Circuit Boards (PCBs). STRICT RULE: You must stay on the topic of PCBs, ELECTRONICS, YOLOV8, "
+            "COMPUTER VISION, OR INDUSTRIAL QUALITY. If the user asks about completely unrelated general topics, "
+            "you must politely refuse and reply: 'My context is strictly limited to the V1si0n system and PCBs. I cannot answer that'.\n\n"
+            "IMPORTANT: When a user provides defect names (even if they have underscores or seem informal, e.g. estano_viejo, pista_levantada), "
+            "you MUST assume they are PCB defects detected by YOLOv8 and explain them technically.\n\n"
+            "CRITICAL LANGUAGE RULE: You MUST answer strictly in English. Even if the defect names or user input contain Spanish words (like 'corto_circuito'), your entire response must be in English.\n\n"
+            "SPECIAL INSTRUCTION: At the end of your response, you MUST ALWAYS suggest 3 short follow-up questions "
+            "relevant to the current conversation. Your response MUST end strictly with this format: \n"
+            "__SUGGESTIONS__\nquestion 1|question 2|question 3\n"
+            "(Do not use bullets or numbers in the suggestions, separate them only with the '|' symbol).\n\n"
+            "CURRENT SYSTEM CONTEXT (you can use this if the user asks):\n"
+            f"- Total historically scanned PCBs: {total_scans}\n"
+            f"- Defective PCBs found: {defect_scans}\n"
+            f"- OK PCBs (No defects): {ok_scans}\n"
+            "- System modules: PCB Scanner, Inspection Log, Statistics Dashboard, and AI Chat.\n"
+            "- Your main goal: Help the operator understand defects like 'Short Circuit', 'Excess Flux', 'Bridged Pins', give recommendations, and answer questions about the current system statistics."
+        )
+    else:
+        system_prompt = (
+            "Eres V1si0n, un asistente de IA especializado estrictamente en control de calidad de placas "
+            "de circuito impreso (PCBs). REGLA ESTRICTA: Debes mantenerte en el tema de PCBS, ELECTRÓNICA, YOLOV8, "
+            "VISIÓN POR COMPUTADORA O CALIDAD INDUSTRIAL. Si el usuario pregunta sobre cosas generales no relacionadas, "
+            "debes negarte amablemente y responder: 'Mi contexto está estrictamente limitado al sistema V1si0n y PCBs. No puedo responder eso'.\n\n"
+            "IMPORTANTE: Cuando el usuario te mencione nombres de defectos (incluso si tienen guiones bajos o parecen informales, ej. estano_viejo, pista_levantada), "
+            "DEBES asumir que son defectos de PCB detectados por YOLOv8 y brindarle una explicación y solución técnica.\n\n"
+            "INSTRUCCIÓN ESPECIAL: Al final de tu respuesta, SIEMPRE debes sugerir 3 preguntas cortas de seguimiento "
+            "relevantes a la conversación actual. Tu respuesta DEBE terminar estrictamente con este formato: \n"
+            "__SUGGESTIONS__\npregunta 1|pregunta 2|pregunta 3\n"
+            "(No uses viñetas ni números en las sugerencias, sepáralas únicamente por el símbolo '|').\n\n"
+            "CONTEXTO DEL SISTEMA ACTUAL (puedes usar esto si el usuario pregunta):\n"
+            f"- Total de PCBs escaneadas históricamente: {total_scans}\n"
+            f"- PCBs Defectuosas encontradas: {defect_scans}\n"
+            f"- PCBs OK (Sin defectos): {ok_scans}\n"
+            "- Módulos del sistema: Escáner PCB, Bitácora de Inspecciones, Panel de Estadísticas y Chat de IA.\n"
+            "- Tu objetivo principal: Ayudar al operario a entender defectos como 'Corto Circuito', 'Exceso de Flux', 'Pines Unidos', dar recomendaciones, y responder dudas sobre las estadísticas actuales del sistema."
+        )
     
     # Manejar sesión
     session_id = req.session_id
@@ -579,15 +765,29 @@ async def chat_with_ollama(req: schemas.ChatRequest, current_user: models.User =
                         defects.append(f"{model.names[cls_id]} ({int(conf*100)}%)")
                 
                 if defects:
-                    vision_ctx = f"El escáner YOLOv8 analizó la imagen y encontró los siguientes defectos: {', '.join(defects)}."
-                    user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: {vision_ctx} Por favor, responde a la pregunta del usuario considerando estos defectos y ayúdalo a entender qué significan o cómo solucionarlos.]\n\nPregunta del usuario: {req.message}"
+                    if req.lang == "en":
+                        vision_ctx = f"The YOLOv8 scanner analyzed the image and found the following defects: {', '.join(defects)}."
+                        user_prompt_content = f"[INJECTED VISUAL CONTEXT: {vision_ctx} Please answer the user's question considering these defects and help them understand what they mean or how to fix them.]\n\nUser Question: {req.message}"
+                    else:
+                        vision_ctx = f"El escáner YOLOv8 analizó la imagen y encontró los siguientes defectos: {', '.join(defects)}."
+                        user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: {vision_ctx} Por favor, responde a la pregunta del usuario considerando estos defectos y ayúdalo a entender qué significan o cómo solucionarlos.]\n\nPregunta del usuario: {req.message}"
                 else:
-                    vision_ctx = "El escáner YOLOv8 no detectó ningún defecto evidente en la imagen."
-                    user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: {vision_ctx} Si el usuario pregunta por defectos, dile que la placa parece estar OK. Si la imagen obviamente no parece un PCB, puedes sugerirle suavemente que solo estás entrenado para ver PCBs.]\n\nPregunta del usuario: {req.message}"
+                    if req.lang == "en":
+                        vision_ctx = "The YOLOv8 scanner did not detect any obvious defects in the image."
+                        user_prompt_content = f"[INJECTED VISUAL CONTEXT: {vision_ctx} If the user asks about defects, tell them the board seems OK. If the image obviously doesn't look like a PCB, you can gently suggest that you are only trained to look at PCBs.]\n\nUser Question: {req.message}"
+                    else:
+                        vision_ctx = "El escáner YOLOv8 no detectó ningún defecto evidente en la imagen."
+                        user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: {vision_ctx} Si el usuario pregunta por defectos, dile que la placa parece estar OK. Si la imagen obviamente no parece un PCB, puedes sugerirle suavemente que solo estás entrenado para ver PCBs.]\n\nPregunta del usuario: {req.message}"
             else:
-                user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: El usuario adjuntó una imagen, pero el motor YOLOv8 no está disponible en el servidor.]\n\nPregunta del usuario: {req.message}"
+                if req.lang == "en":
+                    user_prompt_content = f"[INJECTED VISUAL CONTEXT: The user attached an image, but the YOLOv8 engine is not available on the server.]\n\nUser Question: {req.message}"
+                else:
+                    user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: El usuario adjuntó una imagen, pero el motor YOLOv8 no está disponible en el servidor.]\n\nPregunta del usuario: {req.message}"
         except Exception as e:
-            user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: Error procesando la imagen adjunta: {e}]\n\nPregunta del usuario: {req.message}"
+            if req.lang == "en":
+                user_prompt_content = f"[INJECTED VISUAL CONTEXT: Error processing the attached image: {e}]\n\nUser Question: {req.message}"
+            else:
+                user_prompt_content = f"[CONTEXTO VISUAL INYECTADO: Error procesando la imagen adjunta: {e}]\n\nPregunta del usuario: {req.message}"
 
     if not req.is_ephemeral:
         # 1. Guardar mensaje de usuario

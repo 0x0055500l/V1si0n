@@ -1,0 +1,37 @@
+# Arquitectura del Sistema V1si0n (IA de Inspección de PCBs)
+
+El sistema V1si0n es una plataforma integral para el control de calidad automatizado de Placas de Circuito Impreso (PCBs) que combina visión por computadora avanzada, procesamiento de lenguaje natural (LLMs) y un sistema de gestión modular (Dashboard).
+
+## 1. Estructura General
+
+La arquitectura del sistema sigue un modelo Cliente-Servidor (Frontend - Backend) con las siguientes tecnologías:
+- **Frontend (Cliente):** React.js, Vite, React Router, Recharts.
+- **Backend (Servidor):** FastAPI (Python), SQLAlchemy, Ollama (LLM Local), YOLOv8 (Ultralytics).
+- **Base de Datos:** SQLite (Relacional) gestionada mediante SQLAlchemy ORM.
+- **Contenedores y Orquestación:** Docker y Docker Compose para despliegue unificado.
+
+## 2. Componentes Principales
+
+### 2.1 Backend (FastAPI - Python)
+Es el núcleo lógico del sistema. Contiene los siguientes módulos:
+- **Módulo de Visión (YOLOv8):** Recibe las imágenes subidas por el usuario o capturadas en vivo, y las pasa por el modelo YOLO entrenado para detectar defectos (Ej: Cortos, pines unidos, etc.).
+- **Módulo de LLM (Ollama):** Mantiene sesiones de chat conversacionales. Recibe reportes visuales del modelo YOLO ("Contexto Visual Inyectado") y responde de forma natural al usuario ofreciendo recomendaciones sobre cómo solucionar los defectos en la línea de producción. También soporta sesiones "Efímeras" (Autodestruibles).
+- **Gestión de Base de Datos (CRUD):** Maneja la lectura y escritura de Logs de Escaneo, Defectos detectados, Modelos de PCB, Líneas de Producción y Usuarios.
+- **Autenticación (Auth):** Seguridad basada en tokens JWT. Soporta Control de Acceso Basado en Roles (RBAC) aislando datos críticos (Dashboards y Logs globales) del rol 'Inspector'. Incluye mecanismos de recuperación de contraseña y bloqueo por un solo dispositivo.
+- **Módulo de Alertas (Notificaciones):** Un servicio de notificaciones en tiempo real que dispara correos electrónicos (SMTP) y mensajes de Telegram (Bot) incluyendo el detalle del escaneo y la imagen adjunta en miniatura cuando se detectan placas defectuosas.
+
+### 2.2 Frontend (React - Vite)
+La interfaz gráfica es una SPA (Single Page Application) responsiva y moderna (diseño glassmorphism, soporte de modo oscuro/claro).
+- **Login / Register:** Flujo de autenticación con recuperación de contraseña.
+- **Dashboard Principal:** (StatsView) Muestra gráficas de tendencias, porcentaje de defectos, y líneas de producción usando Recharts.
+- **Escáner PCB:** (ScannerView) Permite al operario subir fotos o abrir la cámara web en vivo para realizar inspecciones. Genera bounding boxes (cajas delimitadoras) sobre la imagen donde se encuentran los fallos.
+- **Chatbot (Asistente IA):** (ChatWidget) Un chat flotante y persistente. Soporta grabación de audio (Voice-to-Text integrado), adjunto de imágenes directamente al chat y responde de forma bilingüe (Español/Inglés).
+- **Gestión de Usuarios y Ajustes:** Paneles administrativos para manejar permisos y configurar SMTP / Tokens de Telegram.
+
+## 3. Flujo de Datos Principal (Inspección)
+1. El usuario captura una imagen en el Frontend.
+2. La imagen se envía por HTTP POST (`/predict`) al Backend de FastAPI.
+3. El motor YOLOv8 procesa la imagen y devuelve las coordenadas (bboxes) de los defectos y la probabilidad de confianza.
+4. El Backend guarda un nuevo registro en la Base de Datos (`ScanLog`) y almacena la imagen en la carpeta compartida.
+5. Si se detectan defectos, el Backend dispara asíncronamente (background task) las alertas SMTP y Telegram enviando la foto y los detalles.
+6. El Frontend recibe el JSON y dibuja los resultados en pantalla con alertas en color rojo o verde. El usuario tiene la opción de hacer clic en "Consultar a V1si0n", enviando el estado de la placa al LLM para recomendaciones de corrección.

@@ -207,7 +207,7 @@ export default function StatsView() {
                   {stats.recent_scans.map(scan => (
                     <tr key={scan.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <td style={{ padding: '1rem' }}>#{scan.id}</td>
-                      <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>{new Date(scan.timestamp).toLocaleString()}</td>
+                      <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>{new Date(scan.timestamp).toLocaleString(lang === 'en' ? 'en-US' : 'es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                       <td style={{ padding: '1rem', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{scan.filename}</td>
                       <td style={{ padding: '1rem' }}>
                         <span style={{ 
@@ -215,7 +215,7 @@ export default function StatsView() {
                           background: scan.status === 'OK' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
                           color: scan.status === 'OK' ? '#10b981' : '#ef4444'
                         }}>
-                          {scan.status === 'OK' ? <CheckCircle2 size={14}/> : <XCircle size={14}/>} {scan.status}
+                          {scan.status === 'OK' ? <CheckCircle2 size={14}/> : <XCircle size={14}/>} {t(lang, scan.status.toLowerCase())}
                         </span>
                       </td>
                     </tr>

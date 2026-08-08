@@ -6,11 +6,14 @@ import HistoryView from './views/HistoryView';
 import UsersView from './views/UsersView';
 import SettingsView from './views/SettingsView';
 import ChatWidget from './components/ChatWidget';
+import AboutView from './views/AboutView';
 
 import { Menu, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useLang } from './i18n';
 
 function RealTimeClock() {
+  const lang = useLang();
   const [time, setTime] = useState(new Date());
   
   useEffect(() => {
@@ -21,7 +24,7 @@ function RealTimeClock() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem', background: 'var(--surface-bg)', padding: '0.5rem 1rem', borderRadius: '8px', width: 'fit-content', border: '1px solid var(--surface-border)' }}>
       <Clock size={16} />
-      <span>{time.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} - {time.toLocaleTimeString('es-ES')}</span>
+      <span>{time.toLocaleDateString(lang === 'en' ? 'en-US' : 'es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} - {time.toLocaleTimeString(lang === 'en' ? 'en-US' : 'es-ES')}</span>
     </div>
   );
 }
@@ -32,7 +35,7 @@ export default function DashboardWrapper({ user, role, onLogout }) {
   return (
     <div className="dashboard-layout">
       {/* Mobile Toggle Button */}
-      <button className="mobile-nav-toggle" onClick={() => setIsSidebarOpen(true)}>
+      <button className="mobile-nav-toggle" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
         <Menu size={24} />
       </button>
 
@@ -59,6 +62,7 @@ export default function DashboardWrapper({ user, role, onLogout }) {
               <Route path="/settings" element={<SettingsView />} />
             </>
           )}
+          <Route path="/about" element={<AboutView />} />
         </Routes>
       </main>
     </div>

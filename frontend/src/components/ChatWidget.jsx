@@ -153,9 +153,10 @@ export default function ChatWidget() {
     try {
       const token = localStorage.getItem('access_token');
       const payload = { 
-        message: textToSend || 'Analiza esta imagen por favor.', 
+        message: textToSend || (lang === 'en' ? 'Please analyze this image.' : 'Analiza esta imagen por favor.'), 
         session_id: activeSessionId, 
-        is_ephemeral: isEphemeral 
+        is_ephemeral: isEphemeral,
+        lang: lang
       };
       if (base64Image) payload.image_base64 = base64Image;
 
@@ -254,11 +255,15 @@ export default function ChatWidget() {
 
   // Decide which prompts to show in the sidebar
   const displayedPrompts = dynamicSuggestions.length > 0 
-    ? dynamicSuggestions.map((sugg, i) => ({ id: `dyn-${i}`, title: 'Pregunta sugerida', content: sugg }))
-    : prompts;
+    ? dynamicSuggestions.map((sugg, i) => ({ id: `dyn-${i}`, title: lang === 'en' ? 'Suggested Question' : 'Pregunta sugerida', content: sugg }))
+    : [
+        { id: 's1', title: lang === 'en' ? 'Performance' : 'Rendimiento', content: t(lang, 'suggest_1') },
+        { id: 's2', title: lang === 'en' ? 'Defects' : 'Defectos', content: t(lang, 'suggest_2') },
+        { id: 's3', title: lang === 'en' ? 'Summary' : 'Resumen', content: t(lang, 'suggest_3') }
+      ];
 
   return (
-    <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '250px 1fr 300px', gap: '2rem', height: 'calc(100vh - 4rem)' }}>
+    <div className="animate-fade-in chat-layout" style={{ gap: '2rem', height: 'calc(100vh - 4rem)' }}>
       
       {/* Sessions Sidebar */}
       <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', padding: '1.5rem', overflowY: 'auto' }}>
@@ -316,8 +321,8 @@ export default function ChatWidget() {
             <div key={i} style={{ 
               alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
               maxWidth: '80%',
-              background: m.role === 'user' ? (isEphemeral ? 'var(--danger)' : 'var(--primary)') : 'rgba(255,255,255,0.05)',
-              color: 'white',
+              background: m.role === 'user' ? (isEphemeral ? 'var(--danger)' : 'var(--primary)') : 'var(--surface-bg)',
+              color: m.role === 'user' ? 'white' : 'var(--text-main)',
               padding: '1rem',
               borderRadius: '12px',
               borderBottomRightRadius: m.role === 'user' ? '0' : '12px',

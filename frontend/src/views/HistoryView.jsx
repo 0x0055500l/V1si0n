@@ -37,18 +37,18 @@ export default function HistoryView() {
 
   const exportPDF = () => {
     const doc = new jsPDF('landscape');
-    doc.text("Reporte de Inspecciones - V1si0n", 14, 15);
+    doc.text(t(lang, 'pdf_report_title'), 14, 15);
     
-    const tableColumn = ["ID", "Fecha", "Archivo", "Estado", "Defectos"];
+    const tableColumn = ["ID", t(lang, 'date'), t(lang, 'file'), t(lang, 'status'), t(lang, 'defects')];
     const tableRows = [];
 
     filteredLogs.forEach(log => {
-      const defectList = log.defects ? log.defects.map(d => d.defect?.name || "Defecto").join(", ") : "Ninguno";
+      const defectList = log.defects ? log.defects.map(d => d.defect?.name || "Defecto").join(", ") : t(lang, 'no_defects');
       const logData = [
         log.id,
-        new Date(log.timestamp).toLocaleString(),
+        new Date(log.timestamp).toLocaleString(lang === 'en' ? 'en-US' : 'es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
         log.filename,
-        log.status,
+        t(lang, log.status.toLowerCase()),
         defectList
       ];
       tableRows.push(logData);
@@ -82,10 +82,10 @@ export default function HistoryView() {
   const exportExcel = () => {
     const exportData = filteredLogs.map(log => ({
       ID: log.id,
-      Fecha: new Date(log.timestamp).toLocaleString(),
-      Archivo: log.filename,
-      Estado: log.status,
-      Defectos: log.defects ? log.defects.map(d => d.defect?.name || "Defecto").join(", ") : "Ninguno"
+      [t(lang, 'date')]: new Date(log.timestamp).toLocaleString(lang === 'en' ? 'en-US' : 'es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      [t(lang, 'file')]: log.filename,
+      [t(lang, 'status')]: t(lang, log.status.toLowerCase()),
+      [t(lang, 'defects')]: log.defects && log.defects.length > 0 ? log.defects.map(d => d.defect?.name || "Defecto").join(", ") : t(lang, 'no_defects')
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -172,7 +172,7 @@ export default function HistoryView() {
               {paginatedLogs.map(log => (
                 <tr key={log.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
                   <td style={{ padding: '1rem' }}>#{log.id}</td>
-                  <td style={{ padding: '1rem' }}>{new Date(log.timestamp).toLocaleString()}</td>
+                  <td style={{ padding: '1rem' }}>{new Date(log.timestamp).toLocaleString(lang === 'en' ? 'en-US' : 'es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                   <td style={{ padding: '1rem' }}>{log.filename}</td>
                   <td style={{ padding: '1rem' }}>
                     <span style={{ 
@@ -182,13 +182,13 @@ export default function HistoryView() {
                       background: log.status === 'Defectuoso' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
                       color: log.status === 'Defectuoso' ? 'var(--danger)' : '#10b981'
                     }}>
-                      {log.status}
+                      {t(lang, log.status.toLowerCase())}
                     </span>
                   </td>
                   <td style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {log.defects && log.defects.length > 0 
                       ? log.defects.map(d => d.defect?.name || "Defecto").join(", ") 
-                      : "Ninguno"}
+                      : t(lang, 'no_defects')}
                   </td>
                 </tr>
               ))}

@@ -2,13 +2,16 @@
 
 V1si0n es un sistema moderno, responsivo y ultraseguro diseñado para la detección automatizada de defectos en Placas de Circuito Impreso (PCBs) utilizando Inteligencia Artificial (Visión por Computadora).
 
-## 🌟 Nuevas Características (Fase 2 y 3)
-- **Soporte Multilingüe Completo (i18n):** Interfaz disponible 100% en Inglés y Español con cambio en tiempo real.
-- **Sistema de Chat Avanzado (IA Local):** Múltiples sesiones de chat guardadas y un modo "Chat Secreto" autodestructible, protegido por contraseña.
-- **Configuraciones Avanzadas y Seguridad:** Panel de ajustes para parámetros críticos y módulo de usuarios (CRUD) con validación obligatoria de contraseña de administrador para cada cambio.
-- **Dashboard Estadístico Responsivo:** Gráficas interactivas y dinámicas (basadas en Recharts) que muestran la tasa de éxito y tipos de defectos.
-- **Bitácora de Inspecciones con Exportación:** Registro detallado con capacidad de descargar reportes en PDF y Excel, ahora totalmente adaptado y responsivo.
-- **Inspección en Vivo (WebSockets):** Soporte para escaneo de PCBs en tiempo real (10 FPS) utilizando cámaras locales o móviles, procesando frames con YOLOv8 y renderizando cajas de defectos (bounding boxes) dinámicas sobre el video.
+## 🌟 Nuevas Características (Fases 2, 3 y 4)
+- **Soporte Multilingüe Completo (i18n):** Interfaz disponible 100% en Inglés y Español con cambio en tiempo real, abarcando paneles, reportes PDF/Excel y prompts dinámicos de IA.
+- **Alertas Visuales Avanzadas (Pillow):** Las notificaciones por Telegram y SMTP incluyen directamente la fotografía escaneada superpuesta con Cajas Selectoras (Bounding Boxes) rojas donde la IA encontró el defecto.
+- **Sistema de Chat Avanzado (IA Local):** Múltiples sesiones de chat guardadas y un modo "Chat Secreto" autodestructible, protegido por contraseña. Inyección dinámica del modelo seleccionado y del idioma (con respuesta estricta en el idioma solicitado).
+- **Configuraciones Avanzadas y Seguridad:** Panel de ajustes para parámetros críticos (SMTP, Telegram) y módulo de usuarios (CRUD) protegido por tokens JWT y prevención concurrente de sesiones.
+- **Recuperación de Contraseña:** Flujo nativo de recuperación mediante correos de reseteo con códigos seguros y expiración temporal.
+- **Dashboard Estadístico Responsivo:** Gráficas interactivas y dinámicas (basadas en Recharts) que muestran la tasa de éxito y tipos de defectos con diseño Glassmorphism y soporte Dark/Light Mode.
+- **Notificaciones Ricas (SMTP/Telegram):** Alertas en tiempo real que incluyen adjuntos de las imágenes escaneadas con la región del defecto detectado.
+- **Bitácora de Inspecciones con Exportación:** Registro detallado con capacidad de descargar reportes multilingües en PDF y Excel, totalmente responsivo.
+- **Seguridad Robusta:** Prevención Anti-DevTools activa en producción, roles granulares (Admin e Inspector), y cifrado bcrypt.
 - **Despliegue en Red Local (LAN):** Resolución dinámica de endpoints para permitir el acceso al sistema desde cualquier dispositivo de la red WiFi utilizando la IP local de la computadora principal.
 
 ## 📊 Diagramas del Sistema
@@ -20,14 +23,15 @@ flowchart LR
     I((Inspector))
 
     subgraph Sistema V1si0n
-        UC1([Login / Autenticación])
-        UC2([Gestión de Usuarios - CRUD])
-        UC3([Configuraciones del Sistema])
+        UC1([Login / Recuperación de Contraseña])
+        UC2([Gestión de Usuarios y Seguridad - CRUD])
+        UC3([Configuraciones del Sistema y Alertas])
         UC4([Escaneo de PCB estático - Foto])
         UC5([Escaneo de PCB en Vivo - WebSockets])
         UC6([Visualizar Dashboard Estadístico])
         UC7([Ver y Exportar Bitácora a PDF/Excel])
-        UC8([Chatear con Asistente IA - Llama/Whisper])
+        UC8([Chatear con Asistente IA - Soporte Multi-idioma])
+        UC9([Notificaciones Automáticas Ricas - Telegram/SMTP])
     end
 
     A --> UC1
@@ -45,6 +49,8 @@ flowchart LR
     I --> UC6
     I --> UC7
     I --> UC8
+    
+    Sistema V1si0n --> UC9
 ```
 
 ### 2. Diagrama Entidad-Relación (Base de Datos PostgreSQL)
@@ -71,6 +77,9 @@ erDiagram
         string hashed_password
         boolean is_active
         string dashboard_config
+        string session_token
+        string reset_code
+        datetime reset_expires
         int role_id FK
     }
     ProductionLine {
@@ -180,6 +189,8 @@ flowchart TD
     AI --> YOLO
     AI --> Llama
     AI --> Whisper
+    
+    API -- Enviar Alertas (Foto) --> SMTP_Telegram[Notificadores SMTP/Telegram]
 ```
 
 - **/frontend**: Interfaz web interactiva construida con **React** y **Vite**. Diseñada con un enfoque estético premium (Glassmorphism, Dark Mode). Conectada directamente a la API backend.
@@ -264,11 +275,16 @@ El modelo de visión artificial se entrena localmente para aprovechar la potenci
 ## 🔒 Características de Seguridad (Nivel Senior)
 
 - **Prevención de Fuerza Bruta (Rate Limiting):** Se implementó `slowapi` limitando el endpoint de login (`/token`) a un máximo de **5 intentos por minuto por IP**.
+- **Sesión Única:** Se agregó control estricto de sesión. Un usuario inspector solo puede tener una única sesión activa en toda la planta.
+- **Protección Anti-DevTools:** En producción, se inhibe el acceso a DevTools (Inspeccionar elemento) usando `disable-devtool`, protegiendo la lógica de negocio y variables de entorno del cliente.
 - **Encabezados de Seguridad (HTTP Headers):** Middleware configurado con protección XSS (`X-XSS-Protection`), prevención de Sniffing MIME (`X-Content-Type-Options: nosniff`), bloqueo de Iframes/Clickjacking (`X-Frame-Options: DENY`) y `Strict-Transport-Security`.
 - **Autenticación con JWT:** Tokens de acceso (JSON Web Tokens) persistentes configurados con un tiempo de expiración estricto de **1 hora**. El Frontend gestiona este ciclo de vida de forma automática verificando la validez del token en cada recarga de página.
-- **Contraseñas Seguras:** Hashing mediante `bcrypt` integrado en PostgreSQL, sin almacenar las contraseñas en texto plano.
-- **Validación de Datos y Manejo de Errores Genéricos:** Uso estricto de Pydantic. Los errores de login muestran "Usuario o contraseña incorrectos", previniendo la enumeración de usuarios válidos.
-- **Acceso Basado en Roles (RBAC):** Las funciones administrativas y de edición están protegidas por endpoints que validan estrictamente el rol del token JWT.
+- **Contraseñas Seguras y Flujo de Recuperación:** Hashing mediante `bcrypt` integrado en PostgreSQL. Flujo de "Olvidé mi contraseña" asegurado por tokens de un solo uso con ventana de expiración breve (10 mins).
+- **Acceso Basado en Roles (RBAC):** Las funciones administrativas y de edición están protegidas por endpoints que validan estrictamente el rol del token JWT. Los Inspectores son aislados a ver únicamente sus propios escaneos.
 
 ---
-*Desarrollado para la clase de Inteligencia Artificial.*
+*Desarrollado para la clase de Inteligencia Artificial por:*
+- *Cinthia Paola Paz Alvarado (202310010826)*
+- *Sherley Iveth Ochoa López (202210040236)*
+- *Samantha Margarita Sabillón Mejia (201210010381)*
+- *Josseth Alejandro Bautista Fuentes (201810020200)*

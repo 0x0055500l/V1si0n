@@ -201,7 +201,7 @@ export default function ScannerView({ user }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t(lang, 'lines')}</label>
-            <select value={selectedLine} onChange={e => setSelectedLine(e.target.value)} style={{ width: '100%', padding: '0.75rem', background: 'var(--surface-bg)', color: 'white', border: '1px solid var(--surface-border)', borderRadius: '8px' }}>
+            <select value={selectedLine} onChange={e => setSelectedLine(e.target.value)} style={{ width: '100%', padding: '0.75rem', background: 'var(--surface-bg)', color: 'var(--text-main)', border: '1px solid var(--surface-border)', borderRadius: '8px' }}>
               <option value="">{t(lang, 'select_line')}</option>
               {productionLines.map(line => (
                 <option key={line.id} value={line.id}>{line.name}</option>
@@ -210,7 +210,7 @@ export default function ScannerView({ user }) {
           </div>
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t(lang, 'pcb_models')}</label>
-            <select value={selectedModel} onChange={e => setSelectedModel(e.target.value)} style={{ width: '100%', padding: '0.75rem', background: 'var(--surface-bg)', color: 'white', border: '1px solid var(--surface-border)', borderRadius: '8px' }}>
+            <select value={selectedModel} onChange={e => setSelectedModel(e.target.value)} style={{ width: '100%', padding: '0.75rem', background: 'var(--surface-bg)', color: 'var(--text-main)', border: '1px solid var(--surface-border)', borderRadius: '8px' }}>
               <option value="">{t(lang, 'select_model')}</option>
               {pcbModels.map(model => (
                 <option key={model.id} value={model.id}>{model.name}</option>
@@ -336,7 +336,10 @@ export default function ScannerView({ user }) {
                     <button 
                       onClick={() => {
                         const defectsList = results.defects.map(d => d.type).join(', ');
-                        navigate('/chat', { state: { initialPrompt: `He escaneado una placa y detecté: ${defectsList}. ¿Me puedes explicar qué significa esto y cómo puedo solucionarlo en la línea de producción?` } });
+                        const promptMsg = lang === 'en' 
+                          ? `I have scanned a board and detected: ${defectsList}. Could you explain what this means and how I can fix it on the production line?`
+                          : `He escaneado una placa y detecté: ${defectsList}. ¿Me puedes explicar qué significa esto y cómo puedo solucionarlo en la línea de producción?`;
+                        navigate('/chat', { state: { initialPrompt: promptMsg } });
                       }}
                       className="btn" 
                       style={{ marginTop: '1rem', width: '100%', display: 'flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'center', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', border: '1px solid rgba(99, 102, 241, 0.2)' }}

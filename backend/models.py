@@ -23,6 +23,10 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     role_id = Column(Integer, ForeignKey("roles.id"))
     dashboard_config = Column(String, default='{}')
+    
+    session_token = Column(String, nullable=True) # Para control de sesión única
+    reset_code = Column(String, nullable=True) # Para recuperación de contraseña
+    reset_expires = Column(DateTime, nullable=True)
 
     role = relationship("Role", back_populates="users")
     scans = relationship("ScanLog", back_populates="user")

@@ -64,6 +64,9 @@ export const translations = {
     type_message: "Escribe tu pregunta...",
     secret_message: "Mensaje autodestruible...",
     prompts: "Prompts Sugeridos",
+    suggest_1: "¿Cómo puedo mejorar el rendimiento de la línea 1?",
+    suggest_2: "Cuáles son los defectos más comunes hoy?",
+    suggest_3: "Dame un resumen de las placas defectuosas",
     // Settings
     settings_title: "Configuraciones del Sistema",
     pcb_models: "Modelos PCB",
@@ -77,6 +80,16 @@ export const translations = {
     details: "Detalles",
     action: "Acción",
     no_records: "No hay registros.",
+    email_alerts: "Alertas por Correo Electrónico",
+    email_server: "Servidor SMTP",
+    email_port: "Puerto SMTP",
+    email_user: "Usuario SMTP",
+    email_pass: "Contraseña SMTP",
+    email_recipients: "Destinatarios (separados por coma)",
+    telegram_alerts: "Alertas por Telegram",
+    telegram_bot: "Token del Bot",
+    telegram_chat: "ID del Chat",
+    save_config: "Guardar Configuración",
     // Scanner
     scanner_title: "Análisis de Placas (PCBs)",
     select_line: "-- Seleccionar Línea --",
@@ -99,7 +112,13 @@ export const translations = {
     stop_live: "Detener Escaneo en Vivo",
     live_mode: "Modo en Vivo",
     scanning_live: "Escaneando en vivo...",
-    live_results: "Resultados en Vivo"
+    live_results: "Resultados en Vivo",
+    pdf_report_title: "Reporte de Calidad V1si0n",
+    pdf_inspection_date: "Fecha de Inspección:",
+    pdf_inspector: "Inspector:",
+    pdf_status: "Estado:",
+    pdf_defects: "Defectos Encontrados:",
+    download_pdf: "Descargar Reporte PDF"
   },
   en: {
     dashboard: "Dashboard",
@@ -163,6 +182,9 @@ export const translations = {
     type_message: "Type your question...",
     secret_message: "Self-destructing message...",
     prompts: "Suggested Prompts",
+    suggest_1: "How can I improve the performance of line 1?",
+    suggest_2: "What are the most common defects today?",
+    suggest_3: "Give me a summary of defective boards",
     // Settings
     settings_title: "System Settings",
     pcb_models: "PCB Models",
@@ -176,6 +198,16 @@ export const translations = {
     details: "Details",
     action: "Action",
     no_records: "No records found.",
+    email_alerts: "Email Alerts",
+    email_server: "SMTP Server",
+    email_port: "SMTP Port",
+    email_user: "SMTP User",
+    email_pass: "SMTP Password",
+    email_recipients: "Recipients (comma separated)",
+    telegram_alerts: "Telegram Alerts",
+    telegram_bot: "Bot Token",
+    telegram_chat: "Chat ID",
+    save_config: "Save Configuration",
     // Scanner
     scanner_title: "PCB Analysis",
     select_line: "-- Select Line --",
@@ -198,7 +230,13 @@ export const translations = {
     stop_live: "Stop Live Scan",
     live_mode: "Live Mode",
     scanning_live: "Live scanning...",
-    live_results: "Live Results"
+    live_results: "Live Results",
+    pdf_report_title: "V1si0n Quality Report",
+    pdf_inspection_date: "Inspection Date:",
+    pdf_inspector: "Inspector:",
+    pdf_status: "Status:",
+    pdf_defects: "Defects Found:",
+    download_pdf: "Download PDF Report"
   }
 };
 

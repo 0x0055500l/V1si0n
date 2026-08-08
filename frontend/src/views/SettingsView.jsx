@@ -204,51 +204,51 @@ export default function SettingsView() {
         {loading ? <p>Cargando datos...</p> : (
           activeTab === 'telegram' ? (
             <div style={{ maxWidth: '500px' }}>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Configura los parámetros para recibir alertas en Telegram.</p>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>{t(lang, 'telegram_alerts')}</p>
               <form onSubmit={handleSaveRequest} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Bot Token</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t(lang, 'telegram_bot')}</label>
                   <input type="password" placeholder="Ej. 123456:ABC-DEF1234" required value={telegramForm.bot_token} onChange={e => setTelegramForm({...telegramForm, bot_token: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface-bg)', color: 'var(--text-main)' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Chat ID</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t(lang, 'telegram_chat')}</label>
                   <input type="text" placeholder="Ej. -1001234567890" required value={telegramForm.chat_id} onChange={e => setTelegramForm({...telegramForm, chat_id: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface-bg)', color: 'var(--text-main)' }} />
                 </div>
-                <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>Guardar Integración</button>
+                <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>{t(lang, 'save_config')}</button>
               </form>
             </div>
           ) : activeTab === 'email' ? (
             <div style={{ maxWidth: '500px' }}>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Configura SMTP para alertas por correo.</p>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>{t(lang, 'email_alerts')}</p>
               <form onSubmit={handleSaveRequest} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Servidor SMTP</label>
-                  <input type="text" placeholder="Servidor SMTP (Ej. smtp.gmail.com)" required value={emailForm.smtp_server} onChange={e => setEmailForm({...emailForm, smtp_server: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface-bg)', color: 'var(--text-main)' }} />
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t(lang, 'email_server')}</label>
+                  <input type="text" placeholder="Ej. smtp.gmail.com" required value={emailForm.smtp_server} onChange={e => setEmailForm({...emailForm, smtp_server: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface-bg)', color: 'var(--text-main)' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Puerto SMTP</label>
-                  <input type="number" placeholder="Puerto (Ej. 587)" required value={emailForm.port} onChange={e => setEmailForm({...emailForm, port: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface-bg)', color: 'var(--text-main)' }} />
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t(lang, 'email_port')}</label>
+                  <input type="number" placeholder="Ej. 587" required value={emailForm.port} onChange={e => setEmailForm({...emailForm, port: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface-bg)', color: 'var(--text-main)' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Usuario (Correo)</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t(lang, 'email_user')}</label>
                   <input type="email" placeholder="Usuario Correo" required value={emailForm.user} onChange={e => setEmailForm({...emailForm, user: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface-bg)', color: 'var(--text-main)' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Contraseña (App Password)</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t(lang, 'email_pass')}</label>
                   <input type="password" placeholder="Contraseña SMTP" required value={emailForm.password} onChange={e => setEmailForm({...emailForm, password: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface-bg)', color: 'var(--text-main)' }} />
                 </div>
                 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Destinatarios Adicionales (separados por coma)</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t(lang, 'email_recipients')}</label>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <input type="text" placeholder="correo1@a.com, correo2@a.com" value={emailForm.recipient} onChange={e => setEmailForm({...emailForm, recipient: e.target.value})} style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'var(--surface-bg)', color: 'var(--text-main)' }} />
-                    <button type="button" onClick={() => setShowUsersModal(true)} className="btn btn-secondary" title="Seleccionar de usuarios registrados" style={{ padding: '0.75rem', borderRadius: '8px' }}>
+                    <button type="button" onClick={() => setShowUsersModal(true)} className="btn btn-secondary" title={t(lang, 'select_registered_users')} style={{ padding: '0.75rem', borderRadius: '8px' }}>
                       <UsersIcon size={20} />
                     </button>
                   </div>
                 </div>
 
-                <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>Guardar Integración SMTP</button>
+                <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>{t(lang, 'save_config')}</button>
               </form>
             </div>
           ) : (

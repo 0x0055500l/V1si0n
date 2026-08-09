@@ -24,7 +24,7 @@ flowchart LR
     A((Admin))
     I((Inspector))
 
-    subgraph Sistema V1si0n
+    subgraph "Sistema V1si0n"
         UC1([Login / Recuperación de Contraseña])
         UC2([Gestión de Usuarios y Seguridad - CRUD])
         UC3([Configuraciones del Sistema y Alertas])
@@ -52,7 +52,8 @@ flowchart LR
     I --> UC7
     I --> UC8
     
-    Sistema V1si0n --> UC9
+    UC4 -.-> UC9
+    UC5 -.-> UC9
 ```
 
 ### 2. Diagrama Entidad-Relación (Base de Datos PostgreSQL)

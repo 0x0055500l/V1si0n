@@ -114,6 +114,7 @@ class ScanLogCreate(ScanLogBase):
 class ScanLog(ScanLogBase):
     id: int
     user_id: int
+    thumbnail: Optional[str] = None
     timestamp: datetime
     defects: List[ScanDefect] = []
 
@@ -127,6 +128,21 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+class ActivityLogCreate(BaseModel):
+    module: str
+
+class ActivityLogResponse(BaseModel):
+    id: int
+    user_id: int
+    module: str
+    ip_address: str
+    user_agent: str
+    timestamp: datetime
+    user: User
+
+    class Config:
+        from_attributes = True
 
 class ChatRequest(BaseModel):
     message: str

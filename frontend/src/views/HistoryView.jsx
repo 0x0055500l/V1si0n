@@ -14,6 +14,7 @@ export default function HistoryView() {
   const [sortConfig, setSortConfig] = useState({ key: 'timestamp', direction: 'desc' });
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [zoomImg, setZoomImg] = useState(null);
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -163,6 +164,7 @@ export default function HistoryView() {
               <tr style={{ borderBottom: '1px solid var(--surface-border)', color: 'var(--text-muted)' }}>
                 <th style={{ padding: '1rem', cursor: 'pointer' }} onClick={() => requestSort('id')}>ID {sortConfig.key === 'id' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
                 <th style={{ padding: '1rem', cursor: 'pointer' }} onClick={() => requestSort('timestamp')}>{t(lang, 'date')} {sortConfig.key === 'timestamp' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                <th style={{ padding: '1rem' }}>{t(lang, 'image') || 'Imagen'}</th>
                 <th style={{ padding: '1rem', cursor: 'pointer' }} onClick={() => requestSort('filename')}>{t(lang, 'file')} {sortConfig.key === 'filename' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
                 <th style={{ padding: '1rem', cursor: 'pointer' }} onClick={() => requestSort('status')}>{t(lang, 'status')} {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
                 <th style={{ padding: '1rem' }}>{t(lang, 'defects')}</th>
@@ -173,6 +175,18 @@ export default function HistoryView() {
                 <tr key={log.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
                   <td style={{ padding: '1rem' }}>#{log.id}</td>
                   <td style={{ padding: '1rem' }}>{new Date(log.timestamp).toLocaleString(lang === 'en' ? 'en-US' : 'es-ES', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                  <td style={{ padding: '1rem' }}>
+                    {log.thumbnail ? (
+                      <img 
+                        src={log.thumbnail} 
+                        alt="scan thumbnail" 
+                        style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--surface-border)', cursor: 'zoom-in' }} 
+                        onClick={() => setZoomImg(log.thumbnail)}
+                      />
+                    ) : (
+                      <div style={{ width: '48px', height: '48px', background: 'var(--surface-border)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'var(--text-muted)' }}>N/A</div>
+                    )}
+                  </td>
                   <td style={{ padding: '1rem' }}>{log.filename}</td>
                   <td style={{ padding: '1rem' }}>
                     <span style={{ 
@@ -209,6 +223,15 @@ export default function HistoryView() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {zoomImg && (
+        <div 
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}
+          onClick={() => setZoomImg(null)}
+        >
+          <img src={zoomImg} alt="Zoom" style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.2)' }} />
         </div>
       )}
     </div>

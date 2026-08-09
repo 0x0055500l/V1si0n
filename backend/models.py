@@ -74,6 +74,7 @@ class ScanLog(Base):
     
     filename = Column(String)
     status = Column(String) # Defectuoso, OK
+    thumbnail = Column(Text, nullable=True) # Base64 small image
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="scans")
@@ -148,3 +149,15 @@ class SystemConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     key = Column(String, unique=True, index=True)
     value = Column(String)
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    module = Column(String)
+    ip_address = Column(String)
+    user_agent = Column(String)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")

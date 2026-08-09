@@ -72,7 +72,7 @@ export default function AboutView() {
             </div>
             <div>
               <h4 style={{ margin: 0 }}>Database</h4>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>SQLite, SQLAlchemy</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>PostgreSQL, SQLAlchemy</span>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

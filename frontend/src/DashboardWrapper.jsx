@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import ScannerView from './views/ScannerView';
 import StatsView from './views/StatsView';
@@ -7,6 +7,7 @@ import UsersView from './views/UsersView';
 import SettingsView from './views/SettingsView';
 import ChatWidget from './components/ChatWidget';
 import AboutView from './views/AboutView';
+import ActivityLogView from './views/ActivityLogView';
 
 import { Menu, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -31,6 +32,29 @@ function RealTimeClock() {
 
 export default function DashboardWrapper({ user, role, onLogout }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    const logActivity = async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+      
+      const moduleName = location.pathname === '/' ? '/dashboard' : location.pathname;
+      try {
+        await fetch(`http://${window.location.hostname}:8000/activity`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ module: moduleName })
+        });
+      } catch (err) {
+        console.error('Error logging activity', err);
+      }
+    };
+    logActivity();
+  }, [location.pathname]);
 
   return (
     <div className="dashboard-layout">
@@ -60,6 +84,7 @@ export default function DashboardWrapper({ user, role, onLogout }) {
             <>
               <Route path="/users" element={<UsersView />} />
               <Route path="/settings" element={<SettingsView />} />
+              <Route path="/activity" element={<ActivityLogView />} />
             </>
           )}
           <Route path="/about" element={<AboutView />} />

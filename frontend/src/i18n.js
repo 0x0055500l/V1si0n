@@ -118,7 +118,9 @@ export const translations = {
     pdf_inspector: "Inspector:",
     pdf_status: "Estado:",
     pdf_defects: "Defectos Encontrados:",
-    download_pdf: "Descargar Reporte PDF"
+    download_pdf: "Descargar Reporte PDF",
+    activity_log_title: "Registro de Actividad",
+    image: "Imagen"
   },
   en: {
     dashboard: "Dashboard",
@@ -236,7 +238,9 @@ export const translations = {
     pdf_inspector: "Inspector:",
     pdf_status: "Status:",
     pdf_defects: "Defects Found:",
-    download_pdf: "Download PDF Report"
+    download_pdf: "Download PDF Report",
+    activity_log_title: "Activity Log",
+    image: "Image"
   }
 };
 

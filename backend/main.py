@@ -462,13 +462,25 @@ async def predict_defect(
             
     status_label = "Defectuoso" if has_defects else "OK"
     
+    # Generar thumbnail en base64
+    thumbnail_b64 = None
+    try:
+        img_thumb = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+        img_thumb.thumbnail((128, 128))
+        thumb_io = io.BytesIO()
+        img_thumb.save(thumb_io, format="JPEG", quality=70)
+        thumbnail_b64 = "data:image/jpeg;base64," + base64.b64encode(thumb_io.getvalue()).decode("utf-8")
+    except Exception as e:
+        print(f"Error generando thumbnail: {e}")
+
     # 1. Guardar ScanLog
     scan_log = models.ScanLog(
         user_id=current_user.id,
         production_line_id=production_line_id,
         pcb_model_id=pcb_model_id,
         filename=file.filename,
-        status=status_label
+        status=status_label,
+        thumbnail=thumbnail_b64
     )
     db.add(scan_log)
     db.commit()
@@ -849,7 +861,37 @@ async def speech_to_text(audio: UploadFile = File(...), current_user: models.Use
     except Exception as e:
         if os.path.exists(temp_file):
             os.remove(temp_file)
-        raise HTTPException(status_code=500, detail=f"Error en transcripción: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error transcribiendo audio: {str(e)}")
+
+# ================= ACTIVITY LOGS =================
+@app.post("/activity", response_model=dict)
+def log_activity(
+    req: schemas.ActivityLogCreate, 
+    request: Request,
+    current_user: models.User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    ip_address = request.client.host if request.client else "Unknown"
+    user_agent = request.headers.get("User-Agent", "Unknown")
+    
+    activity = models.ActivityLog(
+        user_id=current_user.id,
+        module=req.module,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    db.add(activity)
+    db.commit()
+    return {"status": "ok"}
+
+@app.get("/activity-logs", response_model=List[schemas.ActivityLogResponse])
+def get_activity_logs(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role.name != "admin":
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    logs = db.query(models.ActivityLog).order_by(models.ActivityLog.timestamp.desc()).all()
+    return logs
+
 
 @app.websocket("/ws/live-scan")
 async def websocket_live_scan(websocket: WebSocket):
@@ -909,3 +951,4 @@ async def websocket_live_scan(websocket: WebSocket):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

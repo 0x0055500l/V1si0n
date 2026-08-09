@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Scan, History, Users, MessageSquare, LogOut, Settings, Bell, Moon, Sun, Globe, Info } from 'lucide-react';
+import { Home, Scan, History, Users, MessageSquare, LogOut, Settings, Bell, Moon, Sun, Globe, Info, Activity } from 'lucide-react';
 import { t, useLang, changeLanguage } from '../i18n';
 
 export default function Sidebar({ user, role, onLogout }) {
@@ -44,6 +44,7 @@ export default function Sidebar({ user, role, onLogout }) {
   if (role === 'admin') {
     navItems.push({ path: '/users', icon: <Users size={20} />, label: t(lang, 'users') });
     navItems.push({ path: '/settings', icon: <Settings size={20} />, label: t(lang, 'settings') });
+    navItems.push({ path: '/activity', icon: <Activity size={20} />, label: t(lang, 'activity_log_title') || 'Actividad' });
   }
   
   navItems.push({ path: '/about', icon: <Info size={20} />, label: lang === 'en' ? 'About' : 'Acerca De' });

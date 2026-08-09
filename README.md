@@ -2,7 +2,9 @@
 
 V1si0n es un sistema moderno, responsivo y ultraseguro diseñado para la detección automatizada de defectos en Placas de Circuito Impreso (PCBs) utilizando Inteligencia Artificial (Visión por Computadora).
 
-## 🌟 Nuevas Características (Fases 2, 3 y 4)
+## 🌟 Nuevas Características (Fases 2, 3, 4 y 5)
+- **Registro de Actividad (Auditoría):** Módulo para roles administrativos que registra el uso del sistema, guardando accesos, metadatos, IP local y timestamps, con filtros y exportación (PDF/Excel).
+- **Miniaturas (Thumbnails) Optimizadas:** Los escaneos en la bitácora ahora comprimen y muestran visualmente mediante un recuadro dinámico (base64) la imagen analizada para referencia rápida y visual con función de Zoom.
 - **Soporte Multilingüe Completo (i18n):** Interfaz disponible 100% en Inglés y Español con cambio en tiempo real, abarcando paneles, reportes PDF/Excel y prompts dinámicos de IA.
 - **Alertas Visuales Avanzadas (Pillow):** Las notificaciones por Telegram y SMTP incluyen directamente la fotografía escaneada superpuesta con Cajas Selectoras (Bounding Boxes) rojas donde la IA encontró el defecto.
 - **Sistema de Chat Avanzado (IA Local):** Múltiples sesiones de chat guardadas y un modo "Chat Secreto" autodestructible, protegido por contraseña. Inyección dinámica del modelo seleccionado y del idioma (con respuesta estricta en el idioma solicitado).

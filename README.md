@@ -289,5 +289,5 @@ El modelo de visión artificial se entrena localmente para aprovechar la potenci
 *Desarrollado para la clase de Inteligencia Artificial por:*
 - *Cinthia Paola Paz Alvarado (202310010826)*
 - *Sherley Iveth Ochoa López (202210040236)*
-- *Samantha Margarita Sabillón Mejia (201210010381)*
+- *Samantha Margarita Sabillón Mejia (201210010381 )*
 - *Josseth Alejandro Bautista Fuentes (201810020200)*
